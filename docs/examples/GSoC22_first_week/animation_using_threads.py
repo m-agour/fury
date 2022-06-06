@@ -69,20 +69,19 @@ label = ui.TextBox2D(50, 50, 'None', position=(400, 700))
 def update_animation_blocking():
     global last
     while 1:
+        # last = time()
+        if showm.lock_current():
+            # ...
+            animation.update()
+        showm.release_current()
         # print(time() - last)
 
-        last = time()
-        if showm.lock_current():
-            animation.update()
-        # print(time() - last)
-        showm.release_current()
         # print(time() - last)
 
 
 def update_animation_different_thread():
     global last
     while 1:
-        print(time() - last)
         last = time()
         animation.update()
         sleep(1 / 1200)
@@ -108,8 +107,8 @@ scene.add(ruler)
 
 showm.initialize()
 
-# update_anim_thread = Thread(target=update_animation_blocking)
-update_anim_thread = Thread(target=update_animation_different_thread)
+update_anim_thread = Thread(target=update_animation_blocking)
+# update_anim_thread = Thread(target=update_animation_different_thread)
 # update_anim_thread = Thread(target=update_animation_no_sleep)
 
 update_anim_thread.start()

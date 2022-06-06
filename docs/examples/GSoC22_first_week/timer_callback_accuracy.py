@@ -89,7 +89,7 @@ def callb(_obj, _event):
 
 def s(_obj, _event):
     global times
-    print(sum(times) * 1000 / len(times))
+    print(times[-1])
 
 
 panel.add_element(start_button, (0.5, 0.33))
@@ -100,6 +100,6 @@ scene.add(panel)
 
 showm.initialize()
 
-showm.add_timer_callback(True, 48, callb)
-showm.add_timer_callback(True, 1000, s)
+showm.add_timer_callback(True, 1014, callb)
+showm.add_timer_callback(True, 7000, s)
 showm.start()

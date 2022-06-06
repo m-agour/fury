@@ -417,7 +417,7 @@ class ShowManager(object):
         except AttributeError:
             return True
 
-    def start(self, multithreaded=False, desired_fps=60):
+    def start(self, multithreaded=False, desired_fps=160):
         """Start interaction.
 
         Parameters
@@ -495,7 +495,7 @@ class ShowManager(object):
         -------
         sucessful : bool
             Returns if the lock was acquired."""
-        t = time.time()
+        # t = time.time()
         if self.is_done():
             return False
         try:

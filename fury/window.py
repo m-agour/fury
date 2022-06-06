@@ -383,7 +383,7 @@ class ShowManager(object):
         if self.order_transparent:
             occlusion_ratio = occlusion_ratio or 0.1
             antialiasing(self.scene, self.window,
-                         multi_samples=0, max_peels=max_peels,
+                         multi_samples=multi_samples, max_peels=max_peels,
                          occlusion_ratio=occlusion_ratio)
 
         if self.interactor_style == 'image':
@@ -437,12 +437,19 @@ class ShowManager(object):
             if multithreaded:
                 while self.iren.GetDone() is False:
                     start_time = time.perf_counter()
+                    # t1 = time.time()
                     self.lock()
-                    self.window.MakeCurrent()
+                    # self.window.MakeCurrent()
                     self.iren.ProcessEvents()  # Check if we can really do that
+                    # t2 = time.time()
                     self.window.Render()
-                    release_context(self.window)
+                    # t2 = time.time() - t2
+
+                    # release_context(self.window)
+                    # t1 = time.time() - t1
+
                     self.release_lock()
+                    # print(int(t1 * 1000), int(t2 * 1000))
                     end_time = time.perf_counter()
                     # throttle to 60fps to avoid busy wait
                     time_per_frame = 1.0/desired_fps
@@ -488,14 +495,16 @@ class ShowManager(object):
         -------
         sucessful : bool
             Returns if the lock was acquired."""
+        t = time.time()
         if self.is_done():
             return False
         try:
-            self.window
             self.lock()
-            self.window.MakeCurrent()
+            # print('locking time', time.time() - t)
+
             return True
         except AttributeError:
+
             return False
 
     def release_current(self):

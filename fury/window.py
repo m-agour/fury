@@ -367,7 +367,7 @@ class ShowManager(object):
         self.stereo = stereo
         self.timers = []
         self.mutex = Lock()
-
+        self.fps = 0
         if self.reset_camera:
             self.scene.ResetCamera()
 
@@ -408,7 +408,15 @@ class ShowManager(object):
 
     def render(self):
         """Render only once."""
+        print(1.0/ (time.perf_counter() - self.last_render_time))
+        self.last_render_time = time.perf_counter()
         self.window.Render()
+
+    @property
+    def frame_rate(self):
+        rtis = time.perf_counter() - self.last_render_time
+        fps = 1.0 / rtis
+        return fps
 
     def is_done(self):
         """Check if show manager is done."""

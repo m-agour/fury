@@ -33,6 +33,17 @@ In order to have the most accuracy we can get, the show manager must render dire
 There were some problems using the multithreaded showManager since some code lines were slowing down the thread and hence the lock was too difficult for the animation thread to acquire.
 I made some examples with and without using the lock. the ones without were better but they were not accurate since we are not rendering after updating the scene!
 
+**The real issue**
+After doing some tests; I found out that this uncertinity of sleep timing differs from os to another. Since the sleep fucntion should transfer control to OS in order to handle IO, that's why the precision was +- 14ms in windows.
+
+Testing again for Python 3.11 windows 64, the accuracy got improved so much (A wild guess is that it doesn't hand over the control to the OS anymore).
+So for windows (maybe MacOS too) this issue should be resolved upgrading to Python 3.11!
+
+Another thing is that vtk's time event callback function or any scheduling library depends mainly on time.sleep(), so all of them should work in high percision upgrading to python 3.11.
+
+
+
+
 Did I get stuck anywhere?
 -------------------------
 I got stuck trying to get the multithreading showManager to work.

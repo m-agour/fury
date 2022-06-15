@@ -25,6 +25,12 @@ try:
     basestring
 except NameError:
     basestring = str
+import ctypes
+import sys
+
+if sys.platform == 'win32' and sys.version_info[1] < 11:
+    winmm = ctypes.WinDLL('winmm')
+    winmm.timeBeginPeriod(1)
 
 
 class Scene(OpenGLRenderer):
@@ -408,7 +414,6 @@ class ShowManager(object):
 
     def render(self):
         """Render only once."""
-        print(1.0/ (time.perf_counter() - self.last_render_time))
         self.last_render_time = time.perf_counter()
         self.window.Render()
 
@@ -425,7 +430,7 @@ class ShowManager(object):
         except AttributeError:
             return True
 
-    def start(self, multithreaded=False, desired_fps=160):
+    def start(self, multithreaded=False, desired_fps=60):
         """Start interaction.
 
         Parameters
@@ -447,13 +452,13 @@ class ShowManager(object):
                     start_time = time.perf_counter()
                     # t1 = time.time()
                     self.lock()
-                    # self.window.MakeCurrent()
+                    self.window.MakeCurrent()
                     self.iren.ProcessEvents()  # Check if we can really do that
                     # t2 = time.time()
                     self.window.Render()
                     # t2 = time.time() - t2
 
-                    # release_context(self.window)
+                    release_context(self.window)
                     # t1 = time.time() - t1
 
                     self.release_lock()

@@ -48,3 +48,60 @@ class LinearInterpolator(Interpolator):
         dt = (t - t1) / (t2 - t1)
         return dt * d + p1
 
+
+class Timeline:
+    def __init__(self, keyframes, interpolator, actors):
+        self._in_time = 0
+        self._out_time = math.inf
+        self._keyframes = keyframes
+        self._actors = actors
+        self.interpolator = interpolator(keyframes)
+
+        self.playing = False
+        self.loop = False
+        self.reversePlaying = False
+        self._last_started_at = 0
+        self._last_timestamp = 0
+        self.speed = 1
+
+    def add_actor(self, actor):
+        self._actors.append(actor)
+
+    def remove_actor(self, actor):
+        self._actors.remove(actor)
+
+    def play(self):
+        self._last_started_at = time.perf_counter() - self._last_timestamp
+        self.playing = True
+
+    def pause(self):
+        self._last_timestamp = self.current_timestamp()
+        self.playing = False
+
+    def stop(self):
+        self._last_timestamp = 0
+        self.playing = False
+
+    def current_timestamp(self):
+        return (time.perf_counter() - self._last_started_at) if self.playing else self._last_timestamp
+
+    def is_playing(self):
+        return self.playing
+
+    def is_stopped(self):
+        return not self.playing and not self._last_timestamp
+
+    def is_paused(self):
+        return not self.playing and self._last_timestamp
+
+    def set_speed(self, speed):
+        self.speed = speed
+
+    def get_speed(self):
+        return self.speed
+
+
+data = {'position': {1: np.array([1, 2, 3]), 2: np.array([11, 2, 0]), 3: np.array([0, 0, 0])}}
+
+tl1 = Timeline(data, LinearInterpolator, [])
+tl2 = Timeline(data, StepInterpolator, [])

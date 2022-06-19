@@ -1,8 +1,5 @@
-import math
 import time
 import numpy as np
-
-from fury import actor
 
 
 class Keyframe:

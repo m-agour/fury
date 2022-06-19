@@ -111,38 +111,52 @@ class Timeline:
         return self.speed
 
     def translate(self, timestamp, position):
-        self._keyframes['position'][timestamp] = position
+        self.set_custom_data('position', timestamp, position)
 
     def rotate(self, timestamp, quat):
         pass
 
     def scale(self, timestamp, scalar):
-        pass
+        self.set_custom_data('scale', timestamp, scalar)
 
     def set_color(self, timestamp, color):
-        pass
+        self.set_custom_data('color', timestamp, color)
 
-    def set_custom_data(self, data_name, timestamp, value):
-        pass
+    def set_keyframes(self, timestamp, keyframes):
+        for key in keyframes:
+            self.set_custom_data(key, timestamp, keyframes[key])
+
+    def set_custom_data(self, attrib, timestamp, value):
+        if attrib not in self._keyframes:
+            self._keyframes[attrib] = {}
+            self._interpolators[attrib] = LinearInterpolator({})
+
+        self._keyframes[attrib][timestamp] = value
+
+        if attrib not in self._interpolators:
+            self._interpolators[attrib] = LinearInterpolator(self._keyframes[attrib])
+        self._interpolators[attrib].update_timestamps()
 
     def get_custom_data(self, timestamp):
         pass
 
     def set_interpolator(self, attrib, interpolator):
-        pass
+        if attrib in self._keyframes:
+            self._interpolators[attrib] = interpolator(self._keyframes[attrib])
 
-    def set_translation_interpolator(self, interpolator):
-        pass
+    def set_position_interpolator(self, interpolator):
+        self.set_interpolator('position', interpolator)
 
     def set_scale_interpolator(self, interpolator):
+        self.set_interpolator('scale', interpolator)
+
+    def set_color_interpolator(self, interpolator):
         pass
 
     def get_interpolator(self, attrib):
         pass
 
     def get_position(self, t):
-        self._interpolators['position'].update_timestamps()
-
         return self._interpolators['position'].interpolate(t)
 
     def get_quaternion(self, t):
@@ -174,8 +188,6 @@ class Timeline:
         for actor in self.get_actors():
             actor.SetPosition(position)
             actor.SetScale(scale)
-            actor.SetColor(color)
-
-
+            actor.GetProperty().SetColor(1, 0, 0)
 
 

@@ -79,8 +79,9 @@ class Timeline:
                 'color': LinearInterpolator(self._keyframes["color"])}
 
     def play(self):
-        self._last_started_at = time.perf_counter() - self._last_timestamp
-        self.playing = True
+        if not self.playing:
+            self._last_started_at = time.perf_counter() - self._last_timestamp
+            self.playing = True
 
     def pause(self):
         self._last_timestamp = self.current_timestamp

@@ -56,7 +56,7 @@ class LinearInterpolator(Interpolator):
 
 
 class Timeline:
-    def __init__(self, actors):
+    def __init__(self, actors=[]):
         self._keyframes = {}
         self._keyframes = {'position': {}, 'rotation': {}, 'scale': {}, 'color': {}}
         self._interpolators = self._init_interpolators()
@@ -148,10 +148,7 @@ class Timeline:
         self.set_interpolator('scale', interpolator)
 
     def set_color_interpolator(self, interpolator):
-        pass
-
-    def get_interpolator(self, attrib):
-        pass
+        self.set_interpolator('color', interpolator)
 
     def get_position(self, t):
         return self._interpolators['position'].interpolate(t)

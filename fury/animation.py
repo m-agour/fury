@@ -30,7 +30,10 @@ class Interpolator(object):
         try:
             return self.timestamps[self.timestamps > t].min()
         except:
-            return self.timestamps[-1]
+            if self.timestamps is not []:
+                return self.timestamps[-1]
+            else:
+                return None
 
 
 class StepInterpolator(Interpolator):
@@ -68,10 +71,17 @@ class Timeline:
     """
     def __init__(self, actors=None):
         self._keyframes = {}
-        self._keyframes = {'position': {}, 'rotation': {}, 'scale': {}, 'color': {}}
+        self._keyframes = {'position': {0: np.array([0, 0, 0])}, 'rotation': {0: np.array([0, 0, 0])},
+                           'scale': {0: np.array([0, 0, 0])}, 'color': {0: np.array([0, 0, 0])}}
         self._interpolators = self._init_interpolators()
-        self._actors = actors
 
+        if actors is not None:
+            if isinstance(actors, list):
+                self._actors = actors.copy()
+            else:
+                self._actors = [actors]
+
+        self._actors = actors
         self.playing = False
         self.loop = False
         self.reversePlaying = False
@@ -102,6 +112,18 @@ class Timeline:
     def current_timestamp(self):
         """Get current timestamp of the animation"""
         return (time.perf_counter() - self._last_started_at) if self.playing else self._last_timestamp
+
+    @property
+    def last_timestamp(self):
+        """Get the max timestamp of all keyframes"""
+        return max(list(max(list(self._keyframes[i].keys()) for i in self._keyframes.keys())))
+
+    def set_timestamp(self, t):
+        """Set current timestamp of the animation"""
+        if self.playing:
+            self._last_started_at = time.perf_counter() - t
+        else:
+            self._last_timestamp = t
 
     def is_playing(self):
         return self.playing

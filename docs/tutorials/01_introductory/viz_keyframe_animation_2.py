@@ -7,6 +7,7 @@ Keyframe animation explained with a simple tutorial
 
 """
 import random
+import threading
 
 import numpy as np
 from fury import actor, window, ui
@@ -21,8 +22,9 @@ showm = window.ShowManager(scene,
 showm.initialize()
 
 # creating the UI panel to hold the playback buttons
-panel = ui.Panel2D(size=(250, 40), color=(1, 1, 1), align="right")
-panel.center = (460, 40)
+panel = ui.Panel2D(size=(150, 30), color=(1, 1, 1), align="right",
+                   has_border=True, border_color=(0, 0.3,  0), border_width=2)
+panel.center = (160/2, 40/2)
 
 # creating 3 buttons to control the animation
 pause_btn = ui.Button2D(
@@ -36,9 +38,9 @@ start_btn = ui.Button2D(
 )
 
 # Add the buttons on the panel
-panel.add_element(pause_btn, (0.15, 0.15))
-panel.add_element(start_btn, (0.45, 0.15))
-panel.add_element(stop_btn, (0.75, 0.15))
+panel.add_element(pause_btn, (0.15, 0.04))
+panel.add_element(start_btn, (0.45, 0.04))
+panel.add_element(stop_btn, (0.7, 0.04))
 
 # creating the actor to be animated
 cube = actor.cube(np.array([[0, 0, 0]]), np.array([[1, 1, 1]]))
@@ -78,7 +80,7 @@ scene.add(panel)
 
 timelines = []
 
-for i in range(100):
+for i in range(200):
     actors = [
         actor.cube(np.array([[0, 0, 0]]), np.random.random([1, 3]), np.random.random([1, 3])),
         actor.octagonalprism(np.array([[0, 0, 0]]), np.random.random([1, 3]), np.random.random([1, 3])),
@@ -88,7 +90,8 @@ for i in range(100):
     t = Timeline([act])
     scene.add(act)
 
-    for time in range(0, 1000, 1):
+    for time in range(0, 100, 1):
+        time /= 2
         if random.random() < 0.1:
             t.translate(time, np.random.random(3) * 600 - 300)
 
@@ -97,20 +100,38 @@ for i in range(100):
             t.scale(time, np.array([s] * 3))
 
         if random.random() < 0.2:
-            t.set_color(time, np.random.random(3) * 6)
+            t.set_color(time, np.random.random(3) * 16)
 
     timelines.append(t)
+
+max_timestamp = max(i.last_timestamp for i in timelines)
+timeline_slider = ui.LineSlider2D(center=(450 + 150/2, 20), initial_value=0,
+                                  orientation='horizontal',
+                                  min_value=0, max_value=100,
+                                  text_alignment='bottom', length=700, line_width=9)
+
+
+def change_timestamp(slider):
+    global max_timestamp, timelines
+    new_timestamp = slider.value * max_timestamp / 100.0
+    [tl.set_timestamp(new_timestamp) for tl in timelines]
+
+
+timeline_slider.on_change = change_timestamp
+
+scene.add(timeline_slider)
 
 
 # making a function to update the animation
 def timer_callback(_obj, _event):
-    scene.azimuth(.1)
+    # scene.azimuth(.1)
     for timeline in timelines:
         timeline.update()
+    timeline_slider.value = timelines[0].current_timestamp * 100 / max_timestamp
     showm.render()
 
 
 # Adding the callback function that updates the animation
-showm.add_timer_callback(True, 10, timer_callback)
+showm.add_timer_callback(True, 1, timer_callback)
 
 showm.start()

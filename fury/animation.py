@@ -21,7 +21,10 @@ class Interpolator(object):
         try:
             return self.timestamps[self.timestamps <= t].max()
         except:
-            return self.timestamps[0]
+            if self.timestamps is not []:
+                return self.timestamps[0]
+            else:
+                return None
 
     def _get_nearest_larger_timestamp(self, t):
         try:
@@ -56,7 +59,14 @@ class LinearInterpolator(Interpolator):
 
 
 class Timeline:
-    def __init__(self, actors=[]):
+    """Keyframe animation timeline class.
+
+    This timeline is responsible for keyframe animations for a single or a group of models.
+    It's used to handle multiple attributes and properties of Fury actors such as transformations, color, and scale.
+    It also accepts custom data and interpolates them such as temperature.
+    Linear interpolation is used by default to interpolate data between main keyframes.
+    """
+    def __init__(self, actors=None):
         self._keyframes = {}
         self._keyframes = {'position': {}, 'rotation': {}, 'scale': {}, 'color': {}}
         self._interpolators = self._init_interpolators()
@@ -90,6 +100,7 @@ class Timeline:
 
     @property
     def current_timestamp(self):
+        """Get current timestamp of the animation"""
         return (time.perf_counter() - self._last_started_at) if self.playing else self._last_timestamp
 
     def is_playing(self):

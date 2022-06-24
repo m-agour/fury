@@ -1,5 +1,8 @@
 import time
 import numpy as np
+from fury.colormap import _rgb2lab, _lab2rgb
+
+from fury import utils
 
 
 class Keyframe:
@@ -46,6 +49,10 @@ class StepInterpolator(Interpolator):
 
 
 class LinearInterpolator(Interpolator):
+    """Linear interpolator for keyframes.
+
+    This is a general linear interpolator to be used for any shape of keyframes data.
+    """
     def __init__(self, keyframes):
         super(LinearInterpolator, self).__init__(keyframes)
 
@@ -61,6 +68,30 @@ class LinearInterpolator(Interpolator):
         return dt * d + p1
 
 
+class LABInterpolator(Interpolator):
+    """LAB interpolator for color keyframes """
+
+    def __init__(self, keyframes):
+        super(LABInterpolator, self).__init__(keyframes)
+        self.lab_keyframes = self._initialize_lab_keyframes()
+
+    def _initialize_lab_keyframes(self):
+        lab_keyframes = {}
+        for key, value in self.keyframes.items():
+            lab_keyframes[key] = _rgb2lab(np.array([value]))
+        return lab_keyframes
+
+    def interpolate(self, t):
+        t1 = self._get_nearest_smaller_timestamp(t)
+        t2 = self._get_nearest_larger_timestamp(t)
+        if t1 == t2:
+            return self.keyframes[t1]
+        p1 = self.lab_keyframes[t1]
+        p2 = self.lab_keyframes[t2]
+        d = p2 - p1
+        dt = (t - t1) / (t2 - t1)
+        return _lab2rgb(dt * d + p1)
+
 class Timeline:
     """Keyframe animation timeline class.
 
@@ -75,13 +106,13 @@ class Timeline:
                            'scale': {0: np.array([0, 0, 0])}, 'color': {0: np.array([0, 0, 0])}}
         self._interpolators = self._init_interpolators()
 
+        # Handle actors while constructing the timeline.
         if actors is not None:
             if isinstance(actors, list):
                 self._actors = actors.copy()
             else:
                 self._actors = [actors]
 
-        self._actors = actors
         self.playing = False
         self.loop = False
         self.reversePlaying = False
@@ -211,10 +242,15 @@ class Timeline:
         t = self.current_timestamp
         position = self.get_position(t)
         scale = self.get_scale(t)
-        color = self.get_color(t)
+        color = self.get_color(t) * 255
+
         for actor in self.get_actors():
             actor.SetPosition(position)
             actor.SetScale(scale)
-            actor.GetProperty().SetColor(1, 0, 0)
+
+            vcolors = utils.colors_from_actor(actor)
+            vcolors[:] = color
+            utils.update_actor(actor)
+
 
 

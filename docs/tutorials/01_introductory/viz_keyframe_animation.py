@@ -10,7 +10,7 @@ Keyframe animation explained with a simple tutorial
 
 import numpy as np
 from fury import actor, window, ui
-from fury.animation import Timeline, StepInterpolator, LinearInterpolator
+from fury.animation import Timeline, StepInterpolator, LinearInterpolator, LABInterpolator, CubicSplineInterpolator
 from fury.data import read_viz_icons
 
 scene = window.Scene()
@@ -44,12 +44,6 @@ panel.add_element(stop_btn, (0.75, 0.15))
 # creating the actor to be animated
 cube = actor.cube(np.array([[0, 0, 0]]), np.array([[1, 1, 1]]))
 
-# creating walls
-walls = actor.square(np.array([[-7, 0, -4], [7, 0, -4], [0, 0, -4]]),
-                     np.array([[-1, 0, 1], [-1, 0, -1], [0, 0, 0]]),
-                     colors=np.array([[1, 1, 1]]), scales=50)
-
-
 # making a function to update the animation
 def timer_callback(_obj, _event):
     timeline.update()
@@ -77,7 +71,6 @@ stop_btn.on_left_mouse_button_clicked = stop_animation
 
 # adding actors to the scene
 scene.add(cube)
-scene.add(walls)
 scene.add(panel)
 
 # Creating a timeline to animate the actor
@@ -85,28 +78,35 @@ timeline = Timeline([cube])
 
 # Adding translation keyframes to the timeline at times 0, 5, and 12
 timeline.translate(0, np.array([0, 0, 0]))
-timeline.translate(5, np.array([-12, 11, 0]))
-timeline.translate(15, np.array([12, -11, 0]))
+timeline.translate(3, np.array([-12, 11, 0]))
+timeline.translate(6, np.array([12, 11, 5]))
+timeline.translate(9, np.array([12, 11, 0]))
 
 # Changing the default scale interpolator to be a step interpolator
 # The default is linear interpolator for translation scale and color keyframes
-timeline.set_scale_interpolator(StepInterpolator)
+# timeline.set_scale_interpolator(StepInterpolator)
 
 # Adding scale keyframes to the timeline at times 0, 3, 6, 15
-timeline.scale(0, np.array([5, 5, 5]))
-timeline.scale(3, np.array([3, 3, 3]))
-timeline.scale(6, np.array([2, 2, 2]))
-timeline.scale(15, np.array([5, 5, 5]))
+timeline.scale(0, np.array([1, 1,  1]))
+# timeline.scale(3, np.array([3, 3, 3]))
+# timeline.scale(6, np.array([2, 2, 2]))
+# timeline.scale(15, np.array([5, 5, 5]))
 
 # Adding color keyframes to the timeline at times 0 and 7
 timeline.set_color(0, np.array([1, 0, 0]))
 timeline.set_color(7, np.array([0, 1, 0]))
 
 # Adding multi property keyframes at the same timestamp.
-timeline.set_keyframes(17, {
-    "position": np.array([0, 0, 0]),
-    "scale": np.array([1, 1, 1])
-})
+# timeline.set_keyframes(17, {
+#     "position": np.array([0, 0, 0]),
+#     "scale": np.array([1, 1, 1])
+# })
+
+
+timeline.set_color_interpolator(LABInterpolator)
+timeline.set_position_interpolator(CubicSplineInterpolator)
+# timeline.set_position_interpolator(LABInterpolator)
+
 
 # Adding the callback function that updates the animation
 showm.add_timer_callback(True, 10, timer_callback)

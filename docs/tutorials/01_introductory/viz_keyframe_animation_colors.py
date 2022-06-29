@@ -9,7 +9,7 @@ Keyframe animation explained with a simple tutorial
 
 import numpy as np
 from fury import actor, window, ui
-from fury.animation import Timeline, StepInterpolator, LinearInterpolator, LABInterpolator
+from fury.animation import Timeline, StepInterpolator, LinearInterpolator, LABInterpolator, HSVInterpolator
 from fury.data import read_viz_icons
 
 scene = window.Scene()
@@ -43,20 +43,23 @@ panel.add_element(stop_btn, (0.75, 0.15))
 cube = actor.cube(np.array([[-2, 0, 0]]))
 cube1 = actor.cube(np.array([[0, 0, 0]]))
 cube2 = actor.cube(np.array([[2, 0, 0]]))
+cube3 = actor.cube(np.array([[4, 0, 0]]))
 
 
 # making a function to update the animation
 def timer_callback(_obj, _event):
     timeline_linear_color.update()
     timeline_LAB_color.update()
-    # print(timeline_linear_color.get_color(), timeline_LAB_color.get_color())
+    timeline_HSV_color.update()
+    timeline_step_color.update()
     showm.render()
 
 
 # Creating a timeline to animate the actor
-timeline_linear_color = Timeline([cube])
-timeline_LAB_color = Timeline([cube1])
-# timeline_linear_color = Timeline([cube])
+timeline_linear_color = Timeline(cube)
+timeline_LAB_color = Timeline(cube1)
+timeline_HSV_color = Timeline(cube2)
+timeline_step_color = Timeline(cube3)
 
 
 # simple adapters for the playback methods to be used on button left click
@@ -64,16 +67,22 @@ timeline_LAB_color = Timeline([cube1])
 def start_animation(i_ren, _obj, _button):
     timeline_linear_color.play()
     timeline_LAB_color.play()
+    timeline_HSV_color.play()
+    timeline_step_color.play()
 
 
 def pause_animation(i_ren, _obj, _button):
     timeline_linear_color.pause()
     timeline_LAB_color.pause()
+    timeline_HSV_color.pause()
+    timeline_step_color.pause()
 
 
 def stop_animation(i_ren, _obj, _button):
     timeline_linear_color.stop()
     timeline_LAB_color.stop()
+    timeline_HSV_color.stop()
+    timeline_step_color.stop()
 
 
 # using the adapters created above
@@ -81,27 +90,55 @@ start_btn.on_left_mouse_button_clicked = start_animation
 pause_btn.on_left_mouse_button_clicked = pause_animation
 stop_btn.on_left_mouse_button_clicked = stop_animation
 
+# labels
+lab_text = actor.vector_text("Linear", (-2.64, -1, 0))
+linear_text = actor.vector_text("LAB", (-0.37, -1, 0))
+hsv_text = actor.vector_text("HSV", (1.68, -1, 0))
+step_text = actor.vector_text("Step", (3.36, -1, 0))
+
 # adding actors to the scene
 scene.add(cube)
 scene.add(cube1)
 scene.add(cube2)
+scene.add(cube3)
+
 scene.add(panel)
+scene.add(lab_text)
+scene.add(linear_text)
+scene.add(hsv_text)
+scene.add(step_text)
+
+kframes = [
+    (0, np.array([1, 0, 0])),
+    (3, np.array([0, 1, 0])),
+    (8, np.array([0.24, 0.1, 0.6]))]
 
 
 # Adding color keyframes to the linearly interpolated timeline
 timeline_linear_color.set_color(0, np.array([1, 0, 0]))
-timeline_linear_color.set_color(3, np.array([0, 1, 0]))
-# timeline_linear_color.set_color(25, np.array([0.24, 0.1, 0.6]))
+timeline_linear_color.set_color(5, np.array([0, 1, 0]))
+timeline_linear_color.set_color(10, np.array([0.24, 0.1, 0.6]))
 
 # Adding color keyframes to the LAB interpolator
 timeline_LAB_color.set_color(0, np.array([1.0, 0, 0]))
-timeline_LAB_color.set_color(3, np.array([0, 1.0, 0]))
-# timeline_LAB_color.set_color(25, np.array([0.24, 0.1, 0.6]))
+timeline_LAB_color.set_color(5, np.array([0, 1.0, 0]))
+timeline_LAB_color.set_color(10, np.array([0.24, 0.1, 0.6]))
+
+# Adding color keyframes to the LAB interpolator
+timeline_HSV_color.set_color(0, np.array([1.0, 0, 0]))
+timeline_HSV_color.set_color(5, np.array([0, 1.0, 0]))
+timeline_HSV_color.set_color(10, np.array([0.24, 0.1, 0.6]))
+
+# Adding color keyframes to the LAB interpolator
+timeline_step_color.set_color(0, np.array([1.0, 0, 0]))
+timeline_step_color.set_color(5, np.array([0, 1.0, 0]))
+timeline_step_color.set_color(10, np.array([0.24, 0.1, 0.6]))
 
 # Changing the default scale interpolator to be a step interpolator
 # The default is linear interpolator for color keyframes
+timeline_HSV_color.set_color_interpolator(HSVInterpolator)
 timeline_LAB_color.set_color_interpolator(LABInterpolator)
-
+timeline_step_color.set_color_interpolator(StepInterpolator)
 
 # Adding the callback function that updates the animation
 showm.add_timer_callback(True, 10, timer_callback)

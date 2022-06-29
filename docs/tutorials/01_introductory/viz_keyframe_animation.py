@@ -88,22 +88,22 @@ timeline.translate(9, np.array([12, 11, 0]))
 
 # Adding scale keyframes to the timeline at times 0, 3, 6, 15
 timeline.scale(0, np.array([1, 1,  1]))
-# timeline.scale(3, np.array([3, 3, 3]))
-# timeline.scale(6, np.array([2, 2, 2]))
-# timeline.scale(15, np.array([5, 5, 5]))
+timeline.scale(3, np.array([3, 3, 3]))
+timeline.scale(6, np.array([2, 2, 2]))
+timeline.scale(15, np.array([5, 5, 5]))
 
 # Adding color keyframes to the timeline at times 0 and 7
 timeline.set_color(0, np.array([1, 0, 0]))
 timeline.set_color(7, np.array([0, 1, 0]))
 
 # Adding multi property keyframes at the same timestamp.
-# timeline.set_keyframes(17, {
-#     "position": np.array([0, 0, 0]),
-#     "scale": np.array([1, 1, 1])
-# })
+timeline.set_keyframes(17, {
+    "position": np.array([0, 0, 0]),
+    "scale": np.array([1, 1, 1])
+})
 
 
-timeline.set_color_interpolator(LABInterpolator)
+# timeline.set_color_interpolator(LABInterpolator)
 timeline.set_position_interpolator(CubicSplineInterpolator)
 # timeline.set_position_interpolator(LABInterpolator)
 

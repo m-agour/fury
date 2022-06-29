@@ -141,6 +141,4 @@ def timer_callback(_obj, _event):
 # Adding the callback function that updates the animation
 showm.add_timer_callback(True, 1, timer_callback)
 
-print(scene.GetActiveCamera().SetDistance(100))
-
 showm.start()

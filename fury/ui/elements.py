@@ -6,6 +6,7 @@ __all__ = ["TextBox2D", "LineSlider2D", "LineDoubleSlider2D",
            "DrawShape", "DrawPanel"]
 
 import os
+from abc import ABC
 from collections import OrderedDict
 from numbers import Number
 from string import printable
@@ -1541,7 +1542,6 @@ class RingSlider2D(UI):
 
 
 class RangeSlider(UI):
-
     """A set of a LineSlider2D and a LineDoubleSlider2D.
     The double slider is used to set the min and max value
     for the LineSlider2D
@@ -1701,7 +1701,6 @@ class RangeSlider(UI):
 
 
 class Option(UI):
-
     """A set of a Button2D and a TextBlock2D to act as a single option
     for checkboxes and radio buttons.
     Clicking the button toggles its checked/unchecked status.
@@ -1793,7 +1792,7 @@ class Option(UI):
         """
         num_newlines = self.label.count('\n')
         self.button.position = coords + \
-            (0, num_newlines * self.font_size * 0.5)
+                               (0, num_newlines * self.font_size * 0.5)
         offset = (self.button.size[0] + self.button_label_gap, 0)
         self.text.position = coords + offset
 
@@ -1816,7 +1815,6 @@ class Option(UI):
 
 
 class Checkbox(UI):
-
     """A 2D set of :class:'Option' objects.
     Multiple options can be selected.
 
@@ -1864,7 +1862,6 @@ class Checkbox(UI):
         self.options = OrderedDict()
         button_y = self.position[1]
         for label in self.labels:
-
             option = Option(label=label,
                             font_size=self.font_size,
                             position=(self.position[0], button_y),
@@ -1872,7 +1869,8 @@ class Checkbox(UI):
 
             line_spacing = option.text.actor.GetTextProperty().GetLineSpacing()
             button_y = button_y + self.font_size * \
-                (label.count('\n') + 1) * (line_spacing + 0.1) + self.padding
+                       (label.count('\n') + 1) * (
+                                   line_spacing + 0.1) + self.padding
             self.options[label] = option
 
             # Set callback
@@ -1899,7 +1897,7 @@ class Checkbox(UI):
     def _get_size(self):
         option_width, option_height = self.options.values()[0].get_size()
         height = len(self.labels) * (option_height + self.padding) \
-            - self.padding
+                 - self.padding
         return np.asarray([option_width, height])
 
     def _handle_option_change(self, option):
@@ -2076,9 +2074,9 @@ class ComboBox2D(UI):
         self.menu_opacity = menu_opacity
 
         # Define subcomponent sizes.
-        self.text_block_size = (int(0.8*size[0]), int(0.3*size[1]))
-        self.drop_menu_size = (size[0], int(0.7*size[1]))
-        self.drop_button_size = (int(0.2*size[0]), int(0.3*size[1]))
+        self.text_block_size = (int(0.8 * size[0]), int(0.3 * size[1]))
+        self.drop_menu_size = (size[0], int(0.7 * size[1]))
+        self.drop_button_size = (int(0.2 * size[0]), int(0.3 * size[1]))
 
         self._icon_files = [
             ('left', read_viz_icons(fname='circle-left.png')),
@@ -2119,27 +2117,27 @@ class ComboBox2D(UI):
         self.panel.add_element(self.drop_down_menu, (0, 0))
 
         if self.draggable:
-            self.drop_down_button.on_left_mouse_button_dragged =\
+            self.drop_down_button.on_left_mouse_button_dragged = \
                 self.left_button_dragged
-            self.drop_down_menu.panel.background.on_left_mouse_button_dragged\
+            self.drop_down_menu.panel.background.on_left_mouse_button_dragged \
                 = self.left_button_dragged
-            self.selection_box.on_left_mouse_button_dragged =\
+            self.selection_box.on_left_mouse_button_dragged = \
                 self.left_button_dragged
-            self.selection_box.background.on_left_mouse_button_dragged =\
+            self.selection_box.background.on_left_mouse_button_dragged = \
                 self.left_button_dragged
 
-            self.drop_down_button.on_left_mouse_button_pressed =\
+            self.drop_down_button.on_left_mouse_button_pressed = \
                 self.left_button_pressed
-            self.drop_down_menu.panel.background.on_left_mouse_button_pressed\
+            self.drop_down_menu.panel.background.on_left_mouse_button_pressed \
                 = self.left_button_pressed
-            self.selection_box.on_left_mouse_button_pressed =\
+            self.selection_box.on_left_mouse_button_pressed = \
                 self.left_button_pressed
-            self.selection_box.background.on_left_mouse_button_pressed =\
+            self.selection_box.background.on_left_mouse_button_pressed = \
                 self.left_button_pressed
         else:
-            self.panel.background.on_left_mouse_button_dragged =\
+            self.panel.background.on_left_mouse_button_dragged = \
                 lambda i_ren, _obj, _comp: i_ren.force_render
-            self.drop_down_menu.panel.background.on_left_mouse_button_dragged\
+            self.drop_down_menu.panel.background.on_left_mouse_button_dragged \
                 = lambda i_ren, _obj, _comp: i_ren.force_render
 
         # Handle mouse wheel events on the slots.
@@ -2172,9 +2170,9 @@ class ComboBox2D(UI):
         """
         self.panel.resize(size)
 
-        self.text_block_size = (int(0.8*size[0]), int(0.3*size[1]))
-        self.drop_menu_size = (size[0], int(0.7*size[1]))
-        self.drop_button_size = (int(0.2*size[0]), int(0.3*size[1]))
+        self.text_block_size = (int(0.8 * size[0]), int(0.3 * size[1]))
+        self.drop_menu_size = (size[0], int(0.7 * size[1]))
+        self.drop_button_size = (int(0.2 * size[0]), int(0.3 * size[1]))
 
         self.panel.update_element(self.selection_box, (0.001, 0.7))
         self.panel.update_element(self.drop_down_button, (0.8, 0.7))
@@ -2400,8 +2398,8 @@ class ListBox2D(UI):
 
         # Add a scroll bar
         scroll_bar_height = self.nb_slots * (size[1] - 2 * self.margin) \
-            / len(self.values)
-        self.scroll_bar = Rectangle2D(size=(int(size[0]/20),
+                            / len(self.values)
+        self.scroll_bar = Rectangle2D(size=(int(size[0] / 20),
                                             scroll_bar_height))
         if len(self.values) <= self.nb_slots:
             self.scroll_bar.set_visibility(False)
@@ -2410,7 +2408,7 @@ class ListBox2D(UI):
 
         # Initialisation of empty text actors
         self.slot_width = size[0] - self.scroll_bar.size[0] - \
-            2 * self.margin - self.margin
+                          2 * self.margin - self.margin
         x = self.margin
         y = size[1] - self.margin
         for _ in range(self.nb_slots):
@@ -2639,15 +2637,16 @@ class ListBox2D(UI):
         self.scroll_bar.set_visibility(True)
 
         self.scroll_bar.height = self.nb_slots * \
-            (self.panel_size[1] - 2 * self.margin) / len(self.values)
+                                 (self.panel_size[1] - 2 * self.margin) / len(
+            self.values)
 
         self.scroll_step_size = (self.slot_height * self.nb_slots -
                                  self.scroll_bar.height) \
-            / (len(self.values) - self.nb_slots)
+                                / (len(self.values) - self.nb_slots)
 
         self.panel.update_element(
             self.scroll_bar, self.panel_size - self.scroll_bar.size -
-            self.margin)
+                             self.margin)
 
         if len(self.values) <= self.nb_slots:
             self.scroll_bar.set_visibility(False)
@@ -3011,7 +3010,7 @@ class FileMenu2D(UI):
         """
         for idx, slot in enumerate(self.listbox.slots):
             list_idx = min(self.listbox.view_offset + idx,
-                           len(self.directory_contents)-1)
+                           len(self.directory_contents) - 1)
             if self.directory_contents[list_idx][1] == "directory":
                 slot.textblock.color = (0, 0.6, 0)
             elif self.directory_contents[list_idx][1] == "file":
@@ -3337,6 +3336,7 @@ class DrawPanel(UI):
         return self.canvas.size
 
     def _set_position(self, coords):
+
         """Set the lower-left corner position of this UI component.
 
         Parameters

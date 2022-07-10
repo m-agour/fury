@@ -7,7 +7,6 @@ from fury.io import load_text
 from fury.lib import (VTK_OBJECT, Command, DataObject, Shader, calldata_type,
                       numpy_support)
 
-
 SHADERS_DIR = os.path.join(os.path.dirname(__file__))
 
 SHADERS_EXTS = ['.glsl', '.vert', '.tesc', '.tese', '.geom', '.frag', '.comp']
@@ -26,13 +25,14 @@ SHADERS_BLOCK = {
     "color": "//VTK::Color",  # material property values
     "clip": "//VTK::Clip",  # clipping plane vars
     "camera": "//VTK::Camera",  # camera and actor matrix values
-    "prim_id": "//VTK::PrimID",   # Apple Bug
+    "prim_id": "//VTK::PrimID",  # Apple Bug
     "valuepass": "//VTK::ValuePass",  # Value raster
     "output": "//VTK::Output",  # only for geometry shader
     "coincident": "//VTK::Coincident",  # handle coincident offsets
     "zbufer": "//VTK::ZBuffer",
     "depth_peeling": "//VTK::DepthPeeling",  # Depth Peeling Support
-    "picking": "//VTK::Picking"  # picking support
+    "picking": "//VTK::Picking",  # picking support
+    "custom": "//VTK::CustomBegin"  # custom begin
 }
 
 # See [1] for a more extensive list of OpenGL constants
@@ -308,6 +308,7 @@ def add_shader_callback(actor, callback, priority=0.):
         # test_values = [999, 500, 0, 999, 500, 0, ...]
 
     """
+
     @calldata_type(VTK_OBJECT)
     def cbk(caller, event, calldata=None):
         callback(caller, event, calldata)

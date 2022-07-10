@@ -709,7 +709,6 @@ def hsv2rgb(hsv):
     v = hsv[..., 2]
 
     hi = np.stack([hi, hi, hi], axis=-1).astype(np.uint8) % 6
-    print(hi)
     out = np.choose(
         hi, np.stack([np.stack((v, t, p), axis=-1),
                       np.stack((q, v, p), axis=-1),
@@ -717,7 +716,6 @@ def hsv2rgb(hsv):
                       np.stack((p, q, v), axis=-1),
                       np.stack((t, p, v), axis=-1),
                       np.stack((v, p, q), axis=-1)]))
-    print(hsv)
     return out
 
 
@@ -745,7 +743,6 @@ def xyz2rgb(xyz):
 
     """
     arr = xyz @ rgb_from_xyz.T.astype(xyz.dtype)
-    print(rgb_from_xyz)
     mask = arr > 0.0031308
     arr[mask] = 1.055 * np.power(arr[mask], 1 / 2.4) - 0.055
     arr[~mask] *= 12.92

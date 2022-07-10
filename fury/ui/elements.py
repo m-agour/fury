@@ -3461,3 +3461,100 @@ class DrawPanel(UI):
         mouse_position = self.clamp_mouse_position(i_ren.event.position)
         self.handle_mouse_drag(mouse_position)
         i_ren.force_render()
+class PlaybackPanel(UI):
+    """A playback controller that can do essential functionalities.
+       such as play, pause, stop, and seek.
+    """
+
+    def __init__(self, timeline):
+        self.timeline = timeline
+        super(PlaybackPanel, self).__init__()
+
+    def _setup(self):
+        """Setup this Panel component.
+
+        """
+
+        # creating 3 buttons to control the animation
+
+        self.panel = Panel2D(size=(150, 30), color=(1, 1, 1), align="right",
+                             has_border=True, border_color=(0, 0.3, 0),
+                             border_width=2)
+        self.panel.center = (160 / 2, 40 / 2)
+
+        self._pause_btn = Button2D(
+            icon_fnames=[("square", read_viz_icons(fname="pause2.png"))]
+        )
+        self._stop_btn = Button2D(
+            icon_fnames=[("square", read_viz_icons(fname="stop2.png"))]
+        )
+        self._play_btn = Button2D(
+            icon_fnames=[("square", read_viz_icons(fname="play3.png"))]
+        )
+
+        self._progress_bar = LineSlider2D(center=(450 + 150 / 2, 20),
+                                          initial_value=0,
+                                          orientation='horizontal',
+                                          min_value=0, max_value=100,
+                                          text_alignment='bottom', length=700,
+                                          line_width=9)
+
+        self.panel.add_element(self._pause_btn, (0.15, 0.04))
+        self.panel.add_element(self._play_btn, (0.45, 0.04))
+        self.panel.add_element(self._stop_btn, (0.7, 0.04))
+
+        self.on_play_button_clicked = lambda: None
+        self.on_pause_button_clicked = lambda: None
+        self.on_stop_button_clicked = lambda: None
+        self.on_progress_bar_changed = lambda x: None
+        self.progress = 0
+        self._progress_bar.value = self.progress
+        self._seek = lambda x: None
+
+        def play(i_ren, _obj, _button):
+            self.timeline.play()
+
+        def pause(i_ren, _obj, _button):
+            self.timeline.pause()
+
+        def stop(i_ren, _obj, _button):
+            self.timeline.stop()
+
+        def slider_change(slider):
+            new_timestamp = slider.value * self.timeline.last_timestamp / 100.0
+            self.timeline.seek(new_timestamp)
+
+        # using the adapters created above
+        self._play_btn.on_left_mouse_button_clicked = play
+        self._pause_btn.on_left_mouse_button_clicked = pause
+        self._stop_btn.on_left_mouse_button_clicked = stop
+
+        self._progress_bar.on_change = slider_change
+
+    def _get_actors(self):
+        """Get the actors composing this UI component."""
+        return self.panel.actors, self._progress_bar
+
+    def _add_to_scene(self, _scene):
+        """Add all subcomponents or VTK props that compose this UI component.
+
+        Parameters
+        ----------
+        scene : scene
+
+        """
+        self.panel.add_to_scene(_scene)
+        self._progress_bar.add_to_scene(_scene)
+
+    def _set_position(self, _coords):
+        """Set the lower-left corner position of this UI component.
+
+        Parameters
+        ----------
+        coords: (float, float)
+            Absolute pixel coordinates (x, y).
+        """
+        self.panel.position = _coords
+
+    def _get_size(self):
+        self.panel.size

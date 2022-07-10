@@ -417,7 +417,7 @@ class Timeline:
     keyframes.
     """
 
-    def __init__(self, actors=None, using_shaders=1):
+    def __init__(self, actors=None, using_shaders=0):
         self._keyframes = {'position': {0: np.array([0, 0, 0])},
                            'rotation': {0: np.array([0, 0, 0])},
                            'scale': {0: np.array([1, 1, 1])},
@@ -699,7 +699,6 @@ class CompositeTimeline:
     def add_timeline(self, timeline: Timeline):
         self._timelines.append(timeline)
         self._update_last_timestamp()
-        self._assign_current_timestamp(timeline)
 
     def remove_timeline(self, timeline):
         self._timelines.remove(timeline)

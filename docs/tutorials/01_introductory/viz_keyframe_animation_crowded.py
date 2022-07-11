@@ -54,7 +54,8 @@ walls = actor.square(np.array([[-7, 0, -4], [7, 0, -4], [0, 0, -4]]),
 
 def start_animation(i_ren, _obj, _button):
 
-
+    for timeline in timelines:
+        timeline.start()
 
 def pause_animation(i_ren, _obj, _button):
     for timeline in timelines:

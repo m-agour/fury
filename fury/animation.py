@@ -422,7 +422,7 @@ class Timeline(Container):
     """
 
     def __init__(self, actors=None, using_shaders=1,
-                 add_playback_controller=False):
+                 main_timeline=False):
         super().__init__()
         self._camera_keyframes = {
 
@@ -442,12 +442,30 @@ class Timeline(Container):
         self._pre_cps = defaultdict(dict)
         self._post_cps = defaultdict(dict)
         self._is_using_shaders = using_shaders
+        self._timelines = []
+        self._last_timestamp = 0
+        self._last_started_at = 0
+        self.playing = False
+        self.speed = 1
+        self._current_timestamp = 0
+        self._is_main_timeline = main_timeline
+        self._max_timestamp = 0
 
         if using_shaders:
             self.last_sent_timestamps = defaultdict(dict)
         # Handle actors while constructing the timeline.
-        if add_playback_controller:
+        if main_timeline:
             self.playback_panel = PlaybackPanel()
+            self.playback_panel.on_play_button_clicked = self.play
+            self.playback_panel.on_stop_button_clicked = self.stop
+            self.playback_panel.on_pause_button_clicked = self.pause
+
+            def slider_change(slider):
+                new_timestamp = slider.value * self.max_timestamp / 100.0
+                self.seek_percent(new_timestamp)
+
+            self.playback_panel._progress_bar.on_change = slider_change
+
         if actors is not None:
             self.add_actor(actors)
 
@@ -505,37 +523,12 @@ class Timeline(Container):
                 'scale': LinearInterpolator(self._keyframes["scale"]),
                 'color': LinearInterpolator(self._keyframes["color"])}
 
-    def play(self):
-        """Play the animation"""
-        if not self.playing:
-            self._last_started_at = time.perf_counter() - self._last_timestamp
-            self.playing = True
-
-    def pause(self):
-        """Pause the animation"""
-        self._last_timestamp = self.get_current_timestamp()
-        self.playing = False
-
-    def stop(self):
-        """Stops the animation"""
-        self._last_timestamp = 0
-        self.playing = False
-
-    def restart(self):
-        """Restarts the animation"""
-        self._last_timestamp = 0
-        self.playing = True
-
-    def get_current_timestamp(self):
-        """Get current timestamp of the animation"""
-        return (time.perf_counter() - self._last_started_at) if \
-            self.playing else self._last_timestamp
-
     @property
     def max_timestamp(self):
         """Get the max timestamp of all keyframes"""
-        return max(list(max(list(self._keyframes[i].keys()) for i in
-                            self._keyframes.keys())))
+        return max(self._max_timestamp,
+                   max([0] + [item.max_timestamp for item in self.items
+                        if isinstance(item, Timeline)]))
 
     def set_timestamp(self, t):
         """Set current timestamp of the animation"""
@@ -543,26 +536,6 @@ class Timeline(Container):
             self._last_started_at = time.perf_counter() - t
         else:
             self._last_timestamp = t
-
-    def is_playing(self):
-        """Get the playing status of the timeline"""
-        return self.playing
-
-    def is_stopped(self):
-        """Get the stopped status of the timeline"""
-        return not self.playing and not self._last_timestamp
-
-    def is_paused(self):
-        """Get the paused status of the timeline"""
-        return not self.playing and self._last_timestamp
-
-    def set_speed(self, speed):
-        """Set the speed of the timeline"""
-        self.speed = speed
-
-    def get_speed(self):
-        """Get the speed of the timeline"""
-        return self.speed
 
     def translate(self, timestamp, position, pre_cp=None, post_cp=None):
         self.set_keyframe('position', timestamp, position, pre_cp, post_cp)
@@ -599,6 +572,9 @@ class Timeline(Container):
         else:
             self._interpolators[attrib].setup()
 
+        if timestamp > self._max_timestamp:
+            self._max_timestamp = timestamp
+
     def get_custom_data(self, timestamp):
         pass
 
@@ -631,8 +607,8 @@ class Timeline(Container):
         return self._interpolators['scale'].interpolate(t)
 
     def get_color(self, t=None):
-        return self._interpolators['color'].interpolate(t or
-                                                        self.get_current_timestamp())
+        return self._interpolators['color'].interpolate(
+            t or self.get_current_timestamp())
 
     def get_custom_attrib(self, attrib, t):
         return self._interpolators[attrib].interpolate(t)
@@ -655,75 +631,42 @@ class Timeline(Container):
         # todo: implement removing item from container first
         ...
 
-    def update_animation(self, t=None):
+    def update_animation(self, t=None, force=False):
+        """Update the timelines"""
+
+        tb = time.perf_counter()
         if t is None:
             t = self.get_current_timestamp()
-        self._current_timestamp = t
-        if not self._is_using_shaders:
-            position = self.get_position(t)
-            scale = self.get_scale(t)
-            col = np.clip(self.get_color(t), 0, 1) * 255
-            for actor in self.get_actors():
-                actor.SetPosition(*position)
-                actor.SetScale(scale)
 
-                #  heavy
-                actor.vcolors[:] = col
-                utils.update_actor(actor)
-        else:
-            for actor in self.get_actors():
-                actor.GetShaderProperty().GetVertexCustomUniforms().SetUniformf(
-                    'time', t)
+        elif not force:
+            self.playback_panel.set_time(
+                self.get_current_timestamp() * 100 /
+                self.max_timestamp)
+        for item in self.items:
+            if isinstance(item, Timeline):
+                if self.playing or force:
+                    t = self.get_current_timestamp()
+                [tl.update_animation(t, force=True) for tl in self.items]
+            else:
 
-    def seek(self, new_timestamp):
-        """Change the current timestamp of the animation"""
-        if self.playing:
-            self._last_started_at = time.perf_counter() - new_timestamp
-        else:
-            self._last_timestamp = new_timestamp
-            self.update_animation()
+                if not self._is_using_shaders:
+                    position = self.get_position(t)
+                    scale = self.get_scale(t)
+                    col = np.clip(self.get_color(t), 0, 1) * 255
+                    for actor in self.get_actors():
+                        actor.SetPosition(*position)
+                        actor.SetScale(scale)
+                        continue
+                        actor.vcolors[:] = col
+                        utils.update_actor(actor)
+                else:
+                    self.get_actors()[0].GetShaderProperty().GetVertexCustomUniforms().\
+                        SetUniformf('time', t)
+        # if self._is_main_timeline:
+        #     print(time.perf_counter()-tb)
 
-    def seek_percent(self, p):
-        """Change the current timestamp of the animation"""
-        t = p * self.max_timestamp / 100
-        self.seek(t)
-
-
-class CompositeTimeline(Container):
-    """One or multiple Timeline objects composer
-
-    This composite timeline is responsible for controlling multiple key frame animation
-    timelines for a better performance.
-    """
-
-    def __init__(self, add_playback_controller=True):
-        super().__init__()
-        self._timelines = []
-        self._last_timestamp = 0
-        self._last_started_at = 0
-        self.playing = False
-        self.speed = 1
-        self.max_timestamp = 0
-        self._current_timestamp = 0
-
-        if add_playback_controller:
-            self.playback_panel = PlaybackPanel()
-            self.playback_panel.on_play_button_clicked = self.play
-            self.playback_panel.on_stop_button_clicked = self.stop
-            self.playback_panel.on_pause_button_clicked = self.pause
-
-            def slider_change(slider):
-                new_timestamp = slider.value * self.max_timestamp / 100.0
-                self.seek(new_timestamp)
-
-            self.playback_panel._progress_bar.on_change = slider_change
-
-    def _update_max_timestamp(self):
-        self.max_timestamp = max(i.max_timestamp for i in self.items)
-
-    def add_timeline(self, timeline: Timeline):
+    def add_timeline(self, timeline):
         self.add(timeline)
-        self._update_max_timestamp()
 
     def remove_timelines(self):
         self.clear()
@@ -733,7 +676,7 @@ class CompositeTimeline(Container):
 
     def play(self):
         """Play the animation"""
-        self._update_max_timestamp()
+        self._max_timestamp = self.max_timestamp
         if not self.playing:
             self._last_started_at = time.perf_counter() - self._last_timestamp
             self.playing = True
@@ -792,13 +735,6 @@ class CompositeTimeline(Container):
         self.speed = speed
 
     def add_to_scene(self, ren):
-        super(CompositeTimeline, self).add_to_scene(ren)
-        ren.add(self.playback_panel)
-
-    def update_animation(self, force=False):
-        """Update the timelines"""
-        if not force:
-            self.playback_panel._progress_bar.value = self.get_current_timestamp() * 100 / self.max_timestamp
-        if self.playing or force:
-            t = self.get_current_timestamp()
-            [tl.update_animation(t) for tl in self.items]
+        super(Timeline, self).add_to_scene(ren)
+        if self._is_main_timeline:
+            ren.add(self.playback_panel)

@@ -112,7 +112,7 @@ for t in timelines:
 
     t.set_color_interpolator(LinearInterpolator)
 
-max_timestamp = max(i.last_timestamp for i in timelines)
+max_timestamp = max(i.max_timestamp for i in timelines)
 timeline_slider = ui.LineSlider2D(center=(450 + 150 / 2, 20), initial_value=0,
                                   orientation='horizontal',
                                   min_value=0, max_value=100,

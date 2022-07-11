@@ -3461,13 +3461,14 @@ class DrawPanel(UI):
         mouse_position = self.clamp_mouse_position(i_ren.event.position)
         self.handle_mouse_drag(mouse_position)
         i_ren.force_render()
+
+
 class PlaybackPanel(UI):
     """A playback controller that can do essential functionalities.
        such as play, pause, stop, and seek.
     """
 
-    def __init__(self, timeline):
-        self.timeline = timeline
+    def __init__(self):
         super(PlaybackPanel, self).__init__()
 
     def _setup(self):
@@ -3507,29 +3508,26 @@ class PlaybackPanel(UI):
         self.on_pause_button_clicked = lambda: None
         self.on_stop_button_clicked = lambda: None
         self.on_progress_bar_changed = lambda x: None
-        self.progress = 0
-        self._progress_bar.value = self.progress
-        self._seek = lambda x: None
 
         def play(i_ren, _obj, _button):
-            self.timeline.play()
+            self.on_play_button_clicked()
 
         def pause(i_ren, _obj, _button):
-            self.timeline.pause()
+            self.on_pause_button_clicked()
 
         def stop(i_ren, _obj, _button):
-            self.timeline.stop()
-
-        def slider_change(slider):
-            new_timestamp = slider.value * self.timeline.last_timestamp / 100.0
-            self.timeline.seek(new_timestamp)
+            self.on_stop_button_clicked()
 
         # using the adapters created above
         self._play_btn.on_left_mouse_button_clicked = play
         self._pause_btn.on_left_mouse_button_clicked = pause
         self._stop_btn.on_left_mouse_button_clicked = stop
 
-        self._progress_bar.on_change = slider_change
+    def set_time(self, value):
+        self._progress_bar.value = value
+
+    def set_max_time(self, value):
+        self._progress_bar.max_value = value
 
     def _get_actors(self):
         """Get the actors composing this UI component."""

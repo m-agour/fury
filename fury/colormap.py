@@ -764,6 +764,7 @@ def rgb2xyz(rgb):
     out : (..., 3, ...) ndarray
         The image in XYZ format. Same dimensions as input.
     """
+    rgb = rgb.astype(np.float)
     mask = rgb > 0.04045
     rgb[mask] = np.power((rgb[mask] + 0.055) / 1.055, 2.4)
     rgb[~mask] /= 12.92

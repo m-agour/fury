@@ -57,6 +57,7 @@ def start_animation(i_ren, _obj, _button):
     for timeline in timelines:
         timeline.start()
 
+
 def pause_animation(i_ren, _obj, _button):
     for timeline in timelines:
         timeline.pause()

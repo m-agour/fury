@@ -681,12 +681,15 @@ class Timeline(Container):
             cam_foc = self.get_camera_focal(t)
             if cam_foc is not None:
                 self._camera.SetFocalPoint(cam_foc)
+            self._camera.SetViewUp(0, 1, 0)
             if not self._is_using_shaders:
                 position = self.get_position(t)
                 scale = self.get_scale(t)
                 self.SetPosition(position)
 
                 for actor in self.get_actors():
+                    # actor.vcolors =
+
                     actor.SetScale(scale)
             else:
                 self._current_timestamp = t

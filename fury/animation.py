@@ -1,26 +1,12 @@
 import math
 import time
-from collections import defaultdict
-
 import numpy as np
 from scipy import interpolate
-from vtkmodules.vtkCommonCore import reference, vtkObject
-from vtkmodules.vtkRenderingCore import vtkProp, vtkActor
-
 from fury import utils
-from fury.actor import Container, box, dot
+from fury.actor import Container
 from fury.colormap import rgb2hsv, hsv2rgb, rgb2lab, lab2rgb, xyz2rgb, rgb2xyz
-from fury.lib import Command, PolyData, PolyDataMapper, Actor
-from fury.shaders import shader_to_actor, add_shader_callback
 from fury.ui.elements import PlaybackPanel
-
-
-class Keyframe:
-    def __init__(self, timestamp, data, pre_cp=None, post_cp=None):
-        self.timestamp = timestamp
-        self.data = data
-        self.pre_cp = pre_cp
-        self.post_cp = post_cp
+from vtkmodules.vtkRenderingCore import vtkActor
 
 
 class Interpolator(object):
@@ -35,21 +21,15 @@ class Interpolator(object):
 
     def _get_nearest_smaller_timestamp(self, t):
         try:
-            return self.timestamps[self.timestamps <= t].max()
+            return self.timestamps[:-1][self.timestamps[:-1] <= t].max()
         except:
-            if self.timestamps is not []:
-                return self.timestamps[0]
-            else:
-                return None
+            return self.timestamps[0]
 
     def _get_nearest_larger_timestamp(self, t):
         try:
-            return self.timestamps[self.timestamps > t].min()
+            return self.timestamps[1:][self.timestamps[1:] > t].min()
         except:
-            if self.timestamps is not []:
-                return self.timestamps[-1]
-            else:
-                return None
+            return self.timestamps[-1]
 
     def get_neighbour_timestamps(self, t):
         t1 = self._get_nearest_smaller_timestamp(t)
@@ -62,20 +42,24 @@ class Interpolator(object):
             k1 = {"t": t_s, "data": self.space_keyframes[t_s]}
             k2 = {"t": t_e, "data": self.space_keyframes[t_e]}
         else:
-            k1 = {"t": t_s, "data": self.keyframes[t_s]}
-            k2 = {"t": t_e, "data": self.keyframes[t_e]}
+            k1 = {"t": t_s, "data": self.keyframes[t_s]['value']}
+            k2 = {"t": t_e, "data": self.keyframes[t_e]['value']}
         if isinstance(self, BezierInterpolator):
-            k1["cp"] = self.post_cps[t_s]
-            k2["cp"] = self.pre_cps[t_e]
+            k1["cp"] = self.keyframes['post_cp'][t_s]
+            k2["cp"] = self.keyframes['pre_cp'][t_e]
         return {"start": k1, "end": k2}
 
     @staticmethod
-    def lerp(v1, v2, t1, t2, t):
+    def _lerp(v1, v2, t1, t2, t):
         if t1 == t2:
             return v1
         v = v2 - v1
         dt = (t - t1) / (t2 - t1)
         return dt * v + v1
+
+    @staticmethod
+    def _get_time_delta(t, t1, t2):
+        return 0 if t <= t1 else 1 if t >= t2 else (t - t1) / (t2 - t1)
 
 
 class StepInterpolator(Interpolator):
@@ -94,7 +78,7 @@ class StepInterpolator(Interpolator):
 
     def interpolate(self, t):
         t_lower = self._get_nearest_smaller_timestamp(t)
-        return self.keyframes[t_lower]
+        return self.keyframes[t_lower]['value']
 
 
 class LinearInterpolator(Interpolator):
@@ -116,9 +100,9 @@ class LinearInterpolator(Interpolator):
     def interpolate(self, t):
         t1 = self._get_nearest_smaller_timestamp(t)
         t2 = self._get_nearest_larger_timestamp(t)
-        p1 = self.keyframes[t1]
-        p2 = self.keyframes[t2]
-        return self.lerp(p1, p2, t1, t2, t)
+        p1 = self.keyframes[t1]['value']
+        p2 = self.keyframes[t2]['value']
+        return self._lerp(p1, p2, t1, t2, t)
 
 
 class SplineInterpolator(Interpolator):
@@ -154,21 +138,20 @@ class SplineInterpolator(Interpolator):
                           (x[0] - y[0]) * (x[0] - y[0])))
 
     def get_points(self):
-        return [self.keyframes[i] for i in sorted(self.keyframes.keys())]
+        return [self.keyframes[i]['value'] for i in self.timestamps]
 
     def interpolate(self, t):
+
         t1 = self._get_nearest_smaller_timestamp(t)
         t2 = self._get_nearest_larger_timestamp(t)
-        if t1 == t2:
-            return self.keyframes[t1]
 
-        dt = (t - t1) / (t2 - t1)
         mi_index = np.where(self.timestamps == t1)[0][0]
-
+        dt = self._get_time_delta(t, t1, t2)
         sect = sum(self.linear_lengths[:mi_index])
-        t = (sect + dt * (self.linear_lengths[mi_index])) / sum(
+        ts = (sect + dt * (self.linear_lengths[mi_index])) / sum(
             self.linear_lengths)
-        return np.array(interpolate.splev(t, self.tck))
+
+        return np.array(interpolate.splev(ts, self.tck))
 
 
 class CubicSplineInterpolator(SplineInterpolator):
@@ -191,26 +174,24 @@ class BezierInterpolator(Interpolator):
     keyframes data.
     """
 
-    def __init__(self, keyframes, pre_cps, post_cps):
-        self.pre_cps = pre_cps
-        self.post_cps = post_cps
+    def __init__(self, keyframes):
         super(BezierInterpolator, self).__init__(keyframes)
         self.id = 2
 
     def setup(self):
         super(BezierInterpolator, self).setup()
         for ts in self.timestamps:
-            if ts not in self.pre_cps or self.pre_cps[ts] is None:
-                self.pre_cps[ts] = self.keyframes[ts]
-            if ts not in self.post_cps or self.post_cps[ts] is None:
-                self.post_cps[ts] = self.keyframes[ts]
+            if self.keyframes[ts]['pre_cp'] is None:
+                self.keyframes[ts]['pre_cp'] = self.keyframes[ts]['value']
+            if self.keyframes[ts]['post_cp'] is None:
+                self.keyframes[ts]['post_cp'] = self.keyframes[ts]['value']
 
     def interpolate(self, t):
         t1, t2 = self.get_neighbour_timestamps(t)
-        p0 = self.keyframes[t1]
-        p1 = self.post_cps[t1]
-        p2 = self.pre_cps[t2]
-        p3 = self.keyframes[t2]
+        p0 = self.keyframes[t1]['value']
+        p1 = self.keyframes[t1]['post_cp']
+        p2 = self.keyframes[t2]['pre_cp']
+        p3 = self.keyframes[t2]['value']
         if t2 == t1:
             return p0
         dt = (t - t1) / (t2 - t1)
@@ -228,14 +209,14 @@ class ColorInterpolator(Interpolator):
 
     def setup(self):
         super(ColorInterpolator, self).setup()
-        for key, value in self.keyframes.items():
-            self.space_keyframes[key] = self.rgb_to_space(value)
+        for ts, keyframe in self.keyframes.items():
+            self.space_keyframes[ts] = self.rgb_to_space(keyframe['value'])
 
     def interpolate(self, t):
         t1, t2 = self.get_neighbour_timestamps(t)
         p1 = self.space_keyframes[t1]
         p2 = self.space_keyframes[t2]
-        lab_val = self.lerp(p1, p2, t1, t2, t)
+        lab_val = self._lerp(p1, p2, t1, t2, t)
         return self.space_to_rgb(lab_val)
 
 
@@ -263,152 +244,6 @@ class LABInterpolator(ColorInterpolator):
         self.id = 5
 
 
-# Shaders for doing the animation
-vertex_shader_code_decl = \
-    """
-    uniform float time;
-    mat3 xyz_to_rgb_mat = mat3( 3.24048134, -1.53715152, -0.49853633,
-                               -0.96925495,  1.87599   ,  0.04155593,
-                                0.05564664, -0.20404134,  1.05731107);
-                             
-    // Interpolation methods
-    const int STEP = 0;
-    const int LINEAR = 1;
-    const int BEZIER = 2;
-    const int HSV = 3;
-    const int XYZ = 4;
-
-    struct Keyframe {
-        float t;
-        vec3 data;  
-        vec3 cp;
-    };
-    
-    struct Keyframes {
-        Keyframe start;
-        Keyframe end;
-        int method;
-    };
-    
-        
-    uniform Keyframes position_k;
-    uniform Keyframes scale_k;
-    uniform Keyframes color_k; 
-
-    
-    out float t;
-    out vec4 vertexColorVSOutput;
-    
-    bool check_exact(Keyframes k){
-        if (k.start.t == k.end.t || t > k.end.t)
-        return true;
-        return false;
-    }
-    
-    vec3 lerp(Keyframes k){
-        if (check_exact(k)) return k.end.data;
-        float dt = (time - k.start.t) / (k.end.t - k.start.t);
-        return mix(k.start.data, k.end.data, dt);
-    }
-    
-    vec3 cubic_bezier(Keyframes k){
-        if (check_exact(k)) return k.end.data;
-        float t = (time - k.start.t) / (k.end.t - k.start.t);
-        vec3 E = mix(k.start.data, k.start.cp, t);
-        vec3 F = mix(k.start.cp, k.end.cp, t);
-        vec3 G = mix(k.end.cp, k.end.data, t);
-        
-        vec3 H = mix(E, F, t);
-        vec3 I = mix(F, G, t);
-        
-        vec3 P = mix(H, I, t);
-        
-        return P;
-    }
-    
-    vec3 hsv2rgb(vec3 c)
-    {
-        vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
-        vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-        return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
-    }
-            
-    float clip(float x){
-        if (x > 1)
-        return 1;
-        else if (x < 0)
-        return 0;
-        else return x;
-    }
-    vec3 xyz2rgb(vec3 c)
-    {
-        c = c * xyz_to_rgb_mat;
-        float po = 1 / 2.4;
-        if (c.x > 0.0031308) c.x = 1.055 * pow(c.x, po) - 0.055;
-        else c.y *= 12.92;
-        if (c.y > 0.0031308) c.y = 1.055 * pow(c.y, po) - 0.055;
-        else c.y *= 12.92;
-        if (c.z > 0.0031308) c.z = 1.055 * pow(c.z, po) - 0.055;
-        else c.z *= 12.92;
-        
-        c.x = clip(c.x);
-        c.y = clip(c.y);
-        c.z = clip(c.z);
-        
-        return c;
-    }
-    
-    vec3 lab2xyz(vec3 col)
-    {
-        float l = col.x;
-        float a = col.y;
-        float b = col.z;
-        col.y = (l + 16.) / 116.;
-        col.x = (a / 500.) + col.y;
-        col.z = col.y - (b / 200.);
-        return col;
-    }
-    
-    vec3 interp(Keyframes k){
-        if (k.method == LINEAR) return lerp(k);
-        else if (k.method == BEZIER) return cubic_bezier(k);
-        else if (k.method == HSV) return hsv2rgb(lerp(k));
-        else if (k.method == XYZ) return xyz2rgb(lab2xyz(lerp(k)));
-
-    }
-    
-    mat4 transformation(vec3 position, vec3 scale){
-        return mat4(
-            vec4(scale.x, 0.0, 0.0, 0.0),
-            vec4(0.0, scale.y, 0.0, 0.0),
-            vec4(0.0, 0.0, scale.z, 0.0),
-            vec4(position, 1.0));
-    }
-    
-
-    """
-
-vertex_shader_code_impl = \
-    """
-    t = time;
-    // vertexVCVSOutput = MCVCMatrix * vertexMC;
-    vertexColorVSOutput = vec4(interp(color_k), 1);
-    Keyframes pos =  position_k;
-    gl_Position = MCDCMatrix * 
-        transformation(interp(pos), interp(scale_k)) * vertexMC ;   
-    """
-
-fragment_shader_code_decl = \
-    """
-    //varying float t;
-    """
-
-fragment_shader_code_impl = \
-    """
-    fragOutput0 = vec4(1, 1, 1, 1.);
-    """
-
-
 class Timeline(Container):
     """Keyframe animation timeline class.
 
@@ -421,17 +256,19 @@ class Timeline(Container):
     keyframes.
     """
 
-    def __init__(self, actors=None, using_shaders=0,
-                 playback_panel=False):
+    def __init__(self, actors=None, playback_panel=False):
         super().__init__()
-        self._camera_keyframes = defaultdict(dict)
-        self._camera_interpolators = defaultdict(dict)
         self._is_camera_animated = False
-        self._keyframes = {'position': {0: np.array([0, 0, 0])},
-                           'rotation': {0: np.array([0, 0, 0])},
-                           'scale': {0: np.array([1, 1, 1])},
-                           'color': {0: np.array([1, 0, 0])}}
-        self._interpolators = self._init_interpolators()
+        self._data = {
+            'keyframes': {
+                'attribs': {},
+                'camera': {}
+            },
+            'interpolators': {
+                'attribs': {},
+                'camera': {}
+            }
+        }
         self.playing = False
         self.loop = False
         self.reversePlaying = False
@@ -439,10 +276,8 @@ class Timeline(Container):
         self._last_timestamp = 0
         self._current_timestamp = 0
         self.speed = 1
-        self._pre_cps = defaultdict(dict)
-        self._post_cps = defaultdict(dict)
-        self._is_using_shaders = using_shaders
         self._timelines = []
+        self._camera = None
         self._last_timestamp = 0
         self._last_started_at = 0
         self.playing = False
@@ -450,9 +285,6 @@ class Timeline(Container):
         self._current_timestamp = 0
         self._has_playback_panel = playback_panel
         self._max_timestamp = 0
-
-        if using_shaders:
-            self.last_sent_timestamps = defaultdict(dict)
 
         # Handle actors while constructing the timeline.
         if playback_panel:
@@ -465,56 +297,14 @@ class Timeline(Container):
         if actors is not None:
             self.add_actor(actors)
 
-    def _use_shader(self, actor):
-        shader_to_actor(actor, "vertex", impl_code=vertex_shader_code_impl)
-        shader_to_actor(actor, "vertex", impl_code="",
-                        block="color", replace_all=True, keep_default=False)
-        shader_to_actor(actor, "vertex", decl_code=vertex_shader_code_decl,
-                        block="prim_id")
-
-        def shader_callback(_caller, _event, calldata=None):
-            program = calldata
-            if program is not None:
-                if not self._is_using_shaders:
-                    self.update_animation(self._current_timestamp)
-                    return
-                try:
-                    program.SetUniformf('time', self._current_timestamp)
-                    for attrib in ['position', 'scale', 'color']:
-                        program.SetUniformi(f'{attrib}_k.method',
-                                            self._interpolators[attrib].id)
-                        timestamp = self._interpolators[attrib] \
-                            .get_neighbour_timestamps(self._current_timestamp)
-                        # if self.last_sent_timestamps[attrib] == timestamp:
-                        #     continue
-                        self.last_sent_timestamps[attrib] = timestamp
-                        keyframes = self._interpolators[attrib]. \
-                            get_neighbour_keyframes(self._current_timestamp)
-
-                        for kf in keyframes:
-                            for field in keyframes[kf]:
-
-                                if field == 't':
-                                    program.SetUniformf(
-                                        f'{attrib}_k.{kf}.{field}',
-                                        keyframes[kf][field])
-                                else:
-                                    program.SetUniform3f(
-                                        f'{attrib}_k.{kf}.{field}',
-                                        keyframes[kf][field])
-                except ValueError:
-                    print('Error')
-
-        add_shader_callback(actor, shader_callback)
-
-    def _init_interpolators(self):
-        return {'position': LinearInterpolator(self._keyframes["position"]),
-                'rotation': LinearInterpolator(),
-                'scale': LinearInterpolator(self._keyframes["scale"]),
-                'color': LinearInterpolator(self._keyframes["color"])}
-
     def update_max_timestamp(self):
-        """Get the max timestamp of all keyframes"""
+        """Calculate and Get the max timestamp of all keyframes.
+
+        Returns
+        -------
+        float
+            maximum timestamp that can be reached inside the Timeline.
+        """
 
         self._max_timestamp = max(self._max_timestamp,
                                   max([0] + [tl.update_max_timestamp() for tl
@@ -523,75 +313,182 @@ class Timeline(Container):
             self.playback_panel.set_max_time(self._max_timestamp)
         return self._max_timestamp
 
-    def set_timestamp(self, t):
-        """Set current timestamp of the animation"""
+    def set_timestamp(self, timestamp):
+        """Set current timestamp of the animation.
+
+        Parameters
+        ----------
+        timestamp: float
+            Current timestamp to be set.
+        """
         if self.playing:
-            self._last_started_at = time.perf_counter() - t
+            self._last_started_at = time.perf_counter() - timestamp
         else:
-            self._last_timestamp = t
-
-    def translate(self, timestamp, position, pre_cp=None, post_cp=None):
-        self.set_keyframe('position', timestamp, position, pre_cp, post_cp)
-
-    def rotate(self, timestamp, quat):
-        pass
-
-    def scale(self, timestamp, scalar):
-        self.set_keyframe('scale', timestamp, scalar)
-
-    def set_color(self, timestamp, color):
-        self.set_keyframe('color', timestamp, color)
-
-    def set_keyframes(self, timestamp, keyframes):
-        for key in keyframes:
-            self.set_keyframe(key, timestamp, keyframes[key])
+            self._last_timestamp = timestamp
 
     def set_keyframe(self, attrib, timestamp, value, pre_cp=None,
-                     post_cp=None):
-        value = value.astype(np.float)
-        if attrib not in self._keyframes:
-            self._keyframes[attrib] = {}
-            self._pre_cps[attrib] = {}
-            self._post_cps[attrib] = {}
-            self._interpolators[attrib] = LinearInterpolator({})
+                     post_cp=None, is_camera=False):
+        """Set a keyframe for a certain property.
 
-        self._keyframes[attrib][timestamp] = value
-        self._pre_cps[attrib][timestamp] = pre_cp
-        self._post_cps[attrib][timestamp] = post_cp
+        Parameters
+        ----------
+        attrib: str
+            The name of the attribute.
+        timestamp: float
+            Timestamp of the keyframe.
+        value: float
+            Value of the keyframe at the given timestamp.
+        is_camera: bool
+            Indicated whether setting a camera property or general property.
+        pre_cp: float
+            The control point in case of using `cubic Bezier interpolator` when
+            time exceeds this timestamp.
+        post_cp: float
+            The control point in case of using `cubic Bezier interpolator` when
+            time precedes this timestamp.
+        """
+        typ = 'attribs'
+        if is_camera:
+            typ = 'camera'
 
-        if attrib not in self._interpolators:
-            self._interpolators[attrib] = LinearInterpolator(
-                self._keyframes[attrib])
+        if attrib not in self._data['keyframes'][typ]:
+            self._data['keyframes'][typ][attrib] = {}
+        self._data['keyframes'][typ][attrib][timestamp] = {}
+        self._data['keyframes'][typ][attrib][timestamp]['value'] = \
+            np.array(value).astype(np.float)
+        self._data['keyframes'][typ][attrib][timestamp]['pre_cp'] = pre_cp
+        self._data['keyframes'][typ][attrib][timestamp]['post_cp'] = post_cp
+
+        if attrib not in self._data['interpolators'][typ]:
+            self._data['interpolators'][typ][attrib] = LinearInterpolator(
+                self._data['keyframes'][typ][attrib])
+
         else:
-            self._interpolators[attrib].setup()
+            self._data['interpolators'][typ][attrib].setup()
 
         if timestamp > self._max_timestamp:
             self._max_timestamp = timestamp
 
-    def set_camera_keyframe(self, attrib, timestamp, value):
-        value = value.astype(np.float)
-        self._camera_keyframes[attrib][timestamp] = value
-        if attrib not in self._camera_interpolators:
-            self._camera_interpolators[attrib] = LinearInterpolator(
-                self._camera_keyframes[attrib])
-        else:
-            self._camera_interpolators[attrib].setup()
+    def set_keyframes(self, attrib, keyframes, is_camera=False):
+        """Set multiple keyframes for a certain property.
 
-        if timestamp > self._max_timestamp:
-            self._max_timestamp = timestamp
+        Parameters
+        ----------
+        attrib: str
+            The name of the property.
+        keyframes: dict
+            A dict object containing keyframes to be set.
+        is_camera: bool
+            Indicated whether setting a camera property or general property.
 
-    def get_custom_data(self, timestamp):
-        pass
+        Notes
+        ---------
+        Cubic Bezier control points are not supported yet in this setter.
 
-    def set_interpolator(self, attrib, interpolator):
-        if attrib in self._keyframes:
-            if interpolator is BezierInterpolator:
-                self._interpolators[attrib] = interpolator(
-                    self._keyframes[attrib], self._pre_cps[attrib],
-                    self._post_cps[attrib])
-            else:
-                self._interpolators[attrib] = interpolator(
-                    self._keyframes[attrib])
+        Examples
+        ---------
+        >>> pos_keyframes = {1: np.array([1, 2, 3]), 3: np.array([5, 5, 5])}
+        >>> Timeline.set_keyframes('position', pos_keyframes)
+        """
+        for t in keyframes:
+            self.set_keyframe(attrib, t, keyframes[t], is_camera=is_camera)
+
+    def set_camera_keyframe(self, attrib, timestamp, value, pre_cp=None,
+                            post_cp=None):
+        """Set a keyframe for a camera property
+
+        Parameters
+        ----------
+        attrib: str
+            The name of the attribute.
+        timestamp: float
+            Timestamp of the keyframe.
+        value: float
+            Value of the keyframe at the given timestamp.
+        pre_cp: float
+            The control point in case of using `cubic Bezier interpolator` when
+            time exceeds this timestamp.
+        post_cp: float
+            The control point in case of using `cubic Bezier interpolator` when
+            time precedes this timestamp.
+        """
+        self.set_keyframe(attrib, timestamp, value, pre_cp, post_cp, True)
+
+    def set_camera_keyframes(self, attrib, keyframes):
+        """Set multiple keyframes for a certain camera property
+
+        Parameters
+        ----------
+        attrib: str
+            The name of the property.
+        keyframes: dict
+            A dict object containing keyframes to be set.
+
+        Notes
+        ---------
+        Cubic Bezier control points are not supported yet in this setter.
+
+        Examples
+        ---------
+        >>> cam_pos = {1: np.array([1, 2, 3]), 3: np.array([5, 5, 5])}
+        >>> Timeline.set_camera_keyframes('position', cam_pos)
+        """
+        self.set_keyframes(attrib, keyframes, is_camera=True)
+
+    def set_interpolator(self, attrib, interpolator, is_camera=False):
+        """Set keyframes interpolator for a certain property
+
+        Parameters
+        ----------
+        attrib: str
+            The name of the property.
+        interpolator: Interpolator
+            The interpolator to be used to interpolate keyframes.
+        is_camera: bool
+            Indicated whether dealing with a camera property or general
+            property.
+
+        Examples
+        ---------
+        >>> Timeline.set_interpolator('position', LinearInterpolator)
+        """
+        typ = 'attribs'
+        if is_camera:
+            typ = 'camera'
+        if attrib in self._data['keyframes'][typ]:
+            self._data['interpolators'][typ][attrib] = interpolator(
+                self._data['keyframes'][typ][attrib])
+
+    def is_interpolatable(self, attrib, is_camera=False):
+        """Checks if a property is interpolatable.
+
+        Parameters
+        ----------
+        attrib: str
+            The name of the property.
+        is_camera: bool
+            Indicated whether checking a camera property or general property.
+
+        Returns
+        -------
+        bool
+            Interpolatable or not.
+
+        Notes
+        -------
+        True means that it's safe to use interpolator.interpolate(t) for the
+        specified property. And False means the oppisite.
+
+        Examples
+        ---------
+        >>> Timeline.set_interpolator('position', LinearInterpolator)
+        """
+        typ = 'camera' if is_camera else 'attribs'
+        return attrib in self._data['interpolators'][typ]
+
+    def set_camera_interpolator(self, attrib, interpolator):
+
+        self.set_interpolator(attrib, interpolator, is_camera=True)
 
     def set_position_interpolator(self, interpolator):
         self.set_interpolator('position', interpolator)
@@ -602,71 +499,131 @@ class Timeline(Container):
     def set_color_interpolator(self, interpolator):
         self.set_interpolator('color', interpolator)
 
-    def get_position(self, t=None):
-        return self._interpolators['position'].interpolate(t)
-
-    def get_quaternion(self, t=None):
-        return self._interpolators['rotation'].interpolate(t)
-
-    def get_scale(self, t=None):
-        return self._interpolators['scale'].interpolate(t)
-
-    def get_color(self, t=None):
-        return self._interpolators['color'].interpolate(
-            t or self.get_current_timestamp())
-
-    def set_camera_position(self, timestamp, position):
-        self.set_camera_keyframe('position', timestamp, position)
-
-    def get_camera_position(self, t=None):
-        if 'position' in self._camera_interpolators:
-            return self._camera_interpolators['position'].interpolate(
-                t or self.get_current_timestamp())
-
-    def set_camera_focal(self, timestamp, position):
-        self.set_camera_keyframe('focal', timestamp, position)
-
-    def get_camera_focal(self, t=None):
-        if 'focal' in self._camera_interpolators:
-            return self._camera_interpolators['focal'].interpolate(
-                t or self.get_current_timestamp())
-
-    def set_camera_interpolator(self, attrib, interpolator):
-        if attrib in self._camera_keyframes:
-            if interpolator is BezierInterpolator:
-                self._camera_interpolators[attrib] = interpolator(
-                    self._camera_keyframes[attrib], self._pre_cps[attrib],
-                    self._post_cps[attrib])
-            else:
-                self._camera_interpolators[attrib] = interpolator(
-                    self._camera_keyframes[attrib])
+    def set_opacity_interpolator(self, interpolator):
+        self.set_interpolator('opacity', interpolator)
 
     def set_camera_position_interpolator(self, interpolator):
         self.set_camera_interpolator("position", interpolator)
 
     def set_camera_focal_interpolator(self, interpolator):
         self.set_camera_interpolator("focal", interpolator)
+        
+    def get_property_value(self, attrib, t):
+        return self._data['interpolators']['attribs'][attrib].interpolate(t)
+    
+    def get_camera_property_value(self, attrib, t):
+        return self._data['interpolators']['camera'][attrib].interpolate(t)
 
-    def get_custom_attrib(self, attrib, t):
-        return self._interpolators[attrib].interpolate(t)
+    def set_position(self, timestamp, position, pre_cp=None, post_cp=None):
+        self.set_keyframe('position', timestamp, position, pre_cp, post_cp)
+
+    def set_position_keyframes(self, keyframes):
+        self.set_keyframes('position', keyframes)
+
+    def set_rotation(self, timestamp, quat):
+        # not functional yet
+        pass
+
+    def set_scale(self, timestamp, scalar):
+        self.set_keyframe('scale', timestamp, scalar)
+
+    def set_scale_keyframes(self, keyframes):
+        self.set_keyframes('scale', keyframes)
+
+    def set_color(self, timestamp, color):
+        self.set_keyframe('color', timestamp, color)
+
+    def set_color_keyframes(self, keyframes):
+        self.set_keyframes('color', keyframes)
+
+    def set_opacity(self, timestamp, opacity):
+        """Value from 0 to 1"""
+        self.set_keyframe('opacity', timestamp, opacity)
+
+    def set_opacity_keyframes(self, keyframes):
+        self.set_keyframes('opacity', keyframes)
+
+    def get_position(self, t):
+        return self.get_property_value('position', t)
+
+    def get_rotation(self, t):
+        # not functional yet
+        pass
+
+    def get_scale(self, t):
+        return self.get_property_value('scale', t)
+
+    def get_color(self, t):
+        return self.get_property_value('color', t)
+
+    def get_opacity(self, t):
+        return self.get_property_value('opacity', t)
+
+    def set_camera_position(self, timestamp, position):
+        self.set_camera_keyframe('position', timestamp, position)
+
+    def set_camera_position_keyframes(self, keyframes):
+        self.set_camera_keyframes('position', keyframes)
+
+    def set_camera_focal(self, timestamp, position):
+        self.set_camera_keyframe('focal', timestamp, position)
+
+    def set_camera_focal_keyframes(self, keyframes):
+        self.set_camera_keyframes('focal', keyframes)
+
+    def set_camera_view_up(self, timestamp, direction):
+        self.set_camera_keyframe('view_up', timestamp, direction)
+
+    def set_camera_view_up_keyframes(self, keyframes):
+        self.set_camera_keyframes('view_up', keyframes)
+
+    def get_camera_position(self, t):
+        return self.get_camera_property_value('position', t)
+
+    def get_camera_focal(self, t):
+        return self.get_camera_property_value('focal', t)
+
+    def get_camera_view_up(self, t):
+        return self.get_camera_property_value('view_up', t)
+
+    def add(self, item):
+        if isinstance(item, list):
+            for a in item:
+                self.add(a)
+            return
+        elif isinstance(item, vtkActor):
+            self.add_actor(item)
+        elif isinstance(item, Timeline):
+            self.add_timeline(item)
+        else:
+            raise ValueError(f"Object of type {type(item)} can't be added to "
+                             f"the timeline.")
+
+    def add_timeline(self, timeline):
+        self._timelines.append(timeline)
 
     def add_actor(self, actor):
         if isinstance(actor, list):
             for a in actor:
                 self.add_actor(a)
             return
-        if self._is_using_shaders:
-            self._use_shader(actor)
-        else:
-            actor.vcolors = utils.colors_from_actor(actor)
-        self.add(actor)
+        actor.vcolors = utils.colors_from_actor(actor)
+        super(Timeline, self).add(actor)
 
     def get_actors(self):
         return self.items
 
+    def get_timelines(self):
+        return self._timelines
+
+    def remove_timelines(self):
+        self._timelines.clear()
+
     def remove_actor(self, actor):
-        # todo: implement removing item from container first
-        ...
+        self._items.remove(actor)
+
+    def remove_actors(self):
+        self.clear()
 
     def update_animation(self, t=None, force=False):
         """Update the timelines"""
@@ -675,35 +632,36 @@ class Timeline(Container):
         if self._has_playback_panel and not force:
             self.playback_panel.set_time(t)
         if self.playing or force:
-            cam_pos = self.get_camera_position(t)
-            if cam_pos is not None:
+            if self.is_interpolatable('position', is_camera=True):
+                cam_pos = self.get_camera_position(t)
                 self._camera.SetPosition(cam_pos)
-            cam_foc = self.get_camera_focal(t)
-            if cam_foc is not None:
+            if self.is_interpolatable('focal', is_camera=True):
+                cam_foc = self.get_camera_focal(t)
                 self._camera.SetFocalPoint(cam_foc)
-            self._camera.SetViewUp(0, 1, 0)
-            if not self._is_using_shaders:
+            if self.is_interpolatable('view_up', is_camera=True):
+                cam_up = self.get_camera_view_up(t)
+                self._camera.SetViewUp(cam_up)
+
+            if self.is_interpolatable('position'):
                 position = self.get_position(t)
-                scale = self.get_scale(t)
                 self.SetPosition(position)
 
-                for actor in self.get_actors():
-                    # actor.vcolors =
+            if self.is_interpolatable('scale'):
+                scale = self.get_scale(t)
+                [act.SetScale(scale) for act in self.get_actors()]
 
-                    actor.SetScale(scale)
-            else:
-                self._current_timestamp = t
+            if self.is_interpolatable('opacity'):
+                scale = self.get_opacity(t)
+                [act.GetProperty().SetOpacity(scale) for
+                 act in self.get_actors()]
+
+            if self.is_interpolatable('color'):
+                color = self.get_color(t)
+                for act in self.get_actors():
+                    act.vcolors[:] = color * 255
+                    utils.update_actor(act)
 
         [tl.update_animation(t, force=True) for tl in self._timelines]
-
-    def add_timeline(self, timeline):
-        self._timelines.append(timeline)
-
-    def remove_timelines(self):
-        self.clear()
-
-    def get_timelines(self):
-        return self._timelines
 
     def play(self):
         """Play the animation"""
@@ -746,7 +704,9 @@ class Timeline(Container):
             self.update_animation(force=True)
 
     def seek_percent(self, p):
-        """Change the current timestamp of the animation"""
+        """Change the current timestamp of the animation given a value from
+        0 to 100
+        """
         t = p * self._max_timestamp / 100
         self.seek(t)
 
@@ -772,3 +732,4 @@ class Timeline(Container):
             ren.add(self.playback_panel)
         [ren.add(timeline) for timeline in self._timelines]
         self._camera = ren.camera()
+

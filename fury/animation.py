@@ -19,14 +19,18 @@ class Interpolator(object):
     def setup(self):
         self.timestamps = np.sort(np.array(list(self.keyframes)), axis=None)
 
-    def _get_nearest_smaller_timestamp(self, t):
+    def _get_nearest_smaller_timestamp(self, t, include_last=False):
         try:
+            if include_last:
+                return self.timestamps[self.timestamps <= t].max()
             return self.timestamps[:-1][self.timestamps[:-1] <= t].max()
         except:
             return self.timestamps[0]
 
-    def _get_nearest_larger_timestamp(self, t):
+    def _get_nearest_larger_timestamp(self, t, include_first=False):
         try:
+            if include_first:
+                return self.timestamps[self.timestamps > t].min()
             return self.timestamps[1:][self.timestamps[1:] > t].min()
         except:
             return self.timestamps[-1]
@@ -77,7 +81,7 @@ class StepInterpolator(Interpolator):
         super(StepInterpolator, self).setup()
 
     def interpolate(self, t):
-        t_lower = self._get_nearest_smaller_timestamp(t)
+        t_lower = self._get_nearest_smaller_timestamp(t, include_last=True)
         return self.keyframes[t_lower]['value']
 
 
@@ -629,15 +633,19 @@ class Timeline(Container):
         """Update the timelines"""
         if t is None:
             t = self.get_current_timestamp()
+            if t >= self._max_timestamp:
+                self.pause()
         if self._has_playback_panel and not force:
             self.playback_panel.set_time(t)
         if self.playing or force:
             if self.is_interpolatable('position', is_camera=True):
                 cam_pos = self.get_camera_position(t)
                 self._camera.SetPosition(cam_pos)
+
             if self.is_interpolatable('focal', is_camera=True):
                 cam_foc = self.get_camera_focal(t)
                 self._camera.SetFocalPoint(cam_foc)
+
             if self.is_interpolatable('view_up', is_camera=True):
                 cam_up = self.get_camera_view_up(t)
                 self._camera.SetViewUp(cam_up)
@@ -663,6 +671,7 @@ class Timeline(Container):
 
         [tl.update_animation(t, force=True) for tl in self._timelines]
 
+
     def play(self):
         """Play the animation"""
         self.update_max_timestamp()
@@ -674,7 +683,6 @@ class Timeline(Container):
         """Pause the animation"""
         self._last_timestamp = self.get_current_timestamp()
         self.playing = False
-        self.update_animation(force=True)
 
     def stop(self):
         """Stops the animation"""

@@ -472,12 +472,12 @@ class Timeline(Container):
         Returns
         -------
         bool
-            Interpolatable or not.
+            Interpolatable state.
 
         Notes
         -------
         True means that it's safe to use interpolator.interpolate(t) for the
-        specified property. And False means the oppisite.
+        specified property. And False means the opposite.
 
         Examples
         ---------

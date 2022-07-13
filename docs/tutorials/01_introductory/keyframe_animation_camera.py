@@ -1,17 +1,15 @@
 """
-=====================
-Keyframe animation
-=====================
+======================================
+Keyframe animation: Camera and opacity
+======================================
 
-Keyframe animation explained with a simple tutorial
+Camera keyframe animation explained
+in this tutorial
 
 """
-import random
-
 import numpy as np
 from fury import actor, window
-from fury.animation import Timeline, HSVInterpolator, \
-    CubicSplineInterpolator
+from fury.animation import Timeline, CubicSplineInterpolator
 
 scene = window.Scene()
 
@@ -27,53 +25,82 @@ arrow = actor.arrow(np.array([[0, 0, 0]]), np.array([[0, 1, 0]]),
 plan = actor.box(np.array([[0, 0, 0]]), colors=np.array([[1, 1, 1]]),
                  scales=np.array([[20, 0.2, 20]]))
 
+fury_text = actor.vector_text("FURY",
+                              pos=(-4.3, 15, 0),
+                              scale=(2, 2, 2))
+
+# Text of 'FURY' that appears at the end.
+# opacity is set to 0 at time 28 and set to one at time 31.
+# Linear interpolator is always used by default.
+text_timeline = Timeline(fury_text)
+text_timeline.set_opacity(28, 0)
+text_timeline.set_opacity(31, 1)
+
+# The timeline contains the text actor is added to the main Timeline
+# so that we only update this main timeline only without explicitly updating
+# all the timelines
+main_timeline.add_timeline(text_timeline)
+
 for i in range(50):
-    actors = [actor.sphere(np.random.random([1, 3]) * 20,
+    # create a sphere actor
+    actors = [actor.sphere(np.array([[0, 0, 0]]),
                            np.random.random([1, 3]),
                            np.random.random([1, 3]))]
-    timeline = Timeline(actors, using_shaders=0)
+    # create a timeline to animate this actor (single actor or list of actors)
+    # Actors can be added later using `Timeline.add_actor(actor)`
+    timeline = Timeline(actors)
 
-    for t in range(0, 100, 5):
-        timeline.translate(t, np.random.random(3) * 30 - np.array([15, 10, 15]))
-        timeline.scale(t, np.array([random.random()] * 3))
-        # timeline.set_color(t, np.random.random(3))
+    for t in range(0, 50, 2):
+        timeline.set_position(t,
+                              np.random.random(3) * 30 - np.array([15, 0, 15]))
+        timeline.set_scale(t, np.repeat(np.random.random(1), 3))
 
-    timeline.set_color_interpolator(HSVInterpolator)
+    # change the position interpolator to cubic spline interpolator
     timeline.set_position_interpolator(CubicSplineInterpolator)
 
     main_timeline.add_timeline(timeline)
 
 # adding actors to the scene
-scene.add(main_timeline, arrow, plan)
+scene.add(main_timeline, arrow, plan, fury_text)
 
 # camera position animation
 main_timeline.set_camera_position(0, np.array([3, 3, 3]))
-main_timeline.set_camera_position(4, np.array([50, 25, -40]))
-main_timeline.set_camera_position(10, np.array([-50, 50, -40]))
-main_timeline.set_camera_position(14, np.array([-25, 25, -20]))
-main_timeline.set_camera_position(70, np.array([-50, 25, -50]))
 
 # camera focal position animation
-main_timeline.set_camera_focal(15, np.array([0, 0, 0]))
-main_timeline.set_camera_focal(22, np.array([3, 9, 12]))
-main_timeline.set_camera_focal(25, np.array([7, 5, 3]))
-main_timeline.set_camera_focal(30, np.array([-2, 9, -6]))
-main_timeline.set_camera_focal(40, np.array([5, 15, 3]))
-main_timeline.set_camera_focal(50, np.array([0, 17, 0]))
+camera_focal_positions = {
+    # time: focal position
+    15: np.array([0, 0, 0]),
+    20: np.array([3, 9, 5]),
+    23: np.array([7, 5, 3]),
+    25: np.array([-2, 9, -6]),
+    27: np.array([0, 16, 0]),
+    31: np.array([0, 14.5, 0]),
+}
+main_timeline.set_camera_focal_keyframes(camera_focal_positions)
 
+# camera focal position animation
+camera_positions = {
+    # time: camera position
+    0: np.array([3, 3, 3]),
+    4: np.array([50, 25, -40]),
+    7: np.array([-50, 50, -40]),
+    10: np.array([-25, 25, 20]),
+    14: np.array([0, 16, 25]),
+    20: np.array([0, 14.5, 20]),
+}
+#
+main_timeline.set_camera_position_keyframes(camera_positions)
 
+# Change camera position and focal interpolators
 main_timeline.set_camera_position_interpolator(CubicSplineInterpolator)
 main_timeline.set_camera_focal_interpolator(CubicSplineInterpolator)
 
 
-scene.RemoveActor(arrow)
-scene.AddActor(arrow)
 # making a function to update the animation
 def timer_callback(_obj, _event):
     main_timeline.update_animation()
     showm.render()
 
-scene.add()
 
 # Adding the callback function that updates the animation
 showm.add_timer_callback(True, 10, timer_callback)

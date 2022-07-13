@@ -3,7 +3,7 @@
 __all__ = ["TextBox2D", "LineSlider2D", "LineDoubleSlider2D",
            "RingSlider2D", "RangeSlider", "Checkbox", "Option", "RadioButton",
            "ComboBox2D", "ListBox2D", "ListBoxItem2D", "FileMenu2D",
-           "DrawShape", "DrawPanel"]
+           "DrawShape", "DrawPanel", "PlaybackPanel"]
 
 import os
 import time
@@ -3483,7 +3483,7 @@ class PlaybackPanel(UI):
         self.panel = Panel2D(size=(150, 30), color=(1, 1, 1), align="right",
                              has_border=True, border_color=(0, 0.3, 0),
                              border_width=2)
-        self.panel.center = (160 / 2, 40 / 2)
+        self.panel.position = (5, 5)
 
         self._pause_btn = Button2D(
             icon_fnames=[("square", read_viz_icons(fname="pause2.png"))]
@@ -3506,6 +3506,7 @@ class PlaybackPanel(UI):
         self.panel.add_element(self._play_btn, (0.45, 0.04))
         self.panel.add_element(self._stop_btn, (0.7, 0.04))
 
+        # callback functions
         self.on_play_button_clicked = lambda: None
         self.on_pause_button_clicked = lambda: None
         self.on_stop_button_clicked = lambda: None
@@ -3532,12 +3533,33 @@ class PlaybackPanel(UI):
         self._progress_bar.on_change = on_progress_change
 
     def set_time(self, value):
+        """Set progress slider value.
+
+        Parameters
+        ----------
+        value: float
+            Current time to be set.
+        """
         self._progress_bar.value = value
 
     def set_max_time(self, value):
+        """Set max progress slider time value.
+
+        Parameters
+        ----------
+        value: float
+            Max time for the progress slider.
+        """
         self._progress_bar.max_value = value
 
     def get_value(self):
+        """Get current time of the progress slider.
+
+        Returns
+        -------
+        float
+            Progress slider current value.
+        """
         return self._progress_bar.value
 
     def _get_actors(self):
@@ -3549,7 +3571,7 @@ class PlaybackPanel(UI):
 
         Parameters
         ----------
-        scene : scene
+        _scene : scene
 
         """
         self.panel.add_to_scene(_scene)
@@ -3557,14 +3579,9 @@ class PlaybackPanel(UI):
         self.text.add_to_scene(_scene)
 
     def _set_position(self, _coords):
-        """Set the lower-left corner position of this UI component.
-
-        Parameters
-        ----------
-        coords: (float, float)
-            Absolute pixel coordinates (x, y).
-        """
-        self.panel.position = _coords
+        # TODO: after making this playback dynamic in size, this should be set
+        ...
 
     def _get_size(self):
-        self.panel.size
+        # TODO: same as `_set_position`
+        ...

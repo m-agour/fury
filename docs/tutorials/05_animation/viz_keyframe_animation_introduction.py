@@ -22,15 +22,6 @@ showm.initialize()
 
 arrow = actor.arrow(np.array([[0, 0, 0]]), (0, 0, 0), (1, 0, 1), scales=6)
 
-a = actor.arrow(np.array([[0, 0, 0]]), np.array([[0, 0, 0]]), np.array([0, 1,  0]), scales=6)
-a.SetOrientation([160, 50, 20])
-a2 = actor.arrow(np.array([[0, 0, 0]]), np.array([[0, 0, 0]]), np.array([0, 1,  0]), scales=6)
-a2.SetOrientation([60, 160, 0])
-a2.SetPosition([10, 10, 10])
-a3 = actor.arrow(np.array([[0, 0, 0]]), np.array([[0, 0, 0]]), np.array([0, 1,  0]), scales=6)
-a3.SetOrientation([0, -180, 90])
-a3.SetPosition([10, 0, 20])
-
 ###############################################################################
 # Creating a timeline to animate the actor
 timeline = Timeline(playback_panel=Timeline)
@@ -39,7 +30,6 @@ timeline = Timeline(playback_panel=Timeline)
 # Adding the sphere actor to the timeline
 # This could've been done during initialization.
 timeline.add_actor(arrow)
-timeline.add_static_actor(a )
 
 ###############################################################################
 # Adding some position keyframes
@@ -67,7 +57,7 @@ scene.camera().SetPosition(0, 0, 90)
 
 ###############################################################################
 # Adding timelines to the main Timeline.
-scene.add(timeline, a, a2, a3)
+scene.add(timeline)
 
 
 ###############################################################################
@@ -81,10 +71,10 @@ def timer_callback(_obj, _event):
 # Adding the callback function that updates the animation.
 showm.add_timer_callback(True, 10, timer_callback)
 
-interactive = 1
+interactive = False
 
 if interactive:
     showm.start()
 
-window.record(scene, out_path='../01_introductory/viz_keyframe_animation_introduction.png',
+window.record(scene, out_path='viz_keyframe_animation_introduction.png',
               size=(900, 768))

@@ -101,7 +101,7 @@ interactive = False
 if interactive:
     showm.start()
 
-window.record(scene, out_path='viz_keyframe_animation_bezier_1.png',
+window.record(scene, out_path='../01_introductory/viz_keyframe_animation_bezier_1.png',
               size=(900, 768))
 
 ###############################################################################
@@ -187,5 +187,5 @@ showm.add_timer_callback(True, 10, timer_callback)
 if interactive:
     showm.start()
 
-window.record(scene, out_path='viz_keyframe_animation_bezier_2.png',
+window.record(scene, out_path='../01_introductory/viz_keyframe_animation_bezier_2.png',
               size=(900, 768))

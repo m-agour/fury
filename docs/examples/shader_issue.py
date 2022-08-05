@@ -47,7 +47,7 @@ def shader_callback_2(_caller, _event, calldata=None):
     program = calldata
     if program is not None:
         counters[1] += 0.01
-        if counters[1] > 6.28:
+        if counters[1] > 10:
             mapper = c2.GetMapper()
             mapper.RemoveObserver(id2)
         col = [np.sin(counters[1]), np.cos(counters[1]), 1]

@@ -3,12 +3,17 @@ import warnings
 from collections import defaultdict
 from fury import utils, actor
 from fury.actor import Container
+from fury.animation.helpers import get_timestamps_from_keyframes, \
+    get_next_timestamp, get_previous_timestamp
 from fury.animation.interpolator import spline_interpolator, \
     step_interpolator, linear_interpolator
 import numpy as np
 from scipy.spatial import transform
+
+from fury.shaders import add_shader_callback, shader_to_actor, \
+    import_fury_shader
 from fury.ui.elements import PlaybackPanel
-from fury.lib import Actor
+from fury.lib import Actor, Command
 
 
 class Timeline(Container):
@@ -40,9 +45,10 @@ class Timeline(Container):
     """
 
     def __init__(self, actors=None, playback_panel=False, length=None,
-                 loop=False, motion_path_res=None):
+                 loop=False, motion_path_res=None, use_gpu=True):
 
         super().__init__()
+        self._using_shaders = use_gpu
         self._data = defaultdict(dict)
         self._camera_data = defaultdict(dict)
         self.playback_panel = None
@@ -1115,6 +1121,52 @@ class Timeline(Container):
         timeline.update_motion_path()
         self._timelines.append(timeline)
 
+    def _use_shader(self, actor, scene):
+        shader_to_actor(actor, "vertex",
+                        impl_code=import_fury_shader('animation_impl.vert'))
+        shader_to_actor(actor, "vertex", impl_code="",
+                        block="color", replace_all=True, keep_default=False)
+
+        dec_animation_vert = import_fury_shader('animation_dec.vert')
+        shader_to_actor(actor, "vertex", decl_code=dec_animation_vert,
+                        block="prim_id")
+        attribs = ['position', 'scale']
+        timestamps = {attrib: get_timestamps_from_keyframes(self._data.get(
+            attrib, {}).get('keyframes', {})) for attrib in attribs}
+        keyframes = {attrib: self._data.get(attrib, {}).
+            get('keyframes', {}) for attrib in attribs}
+
+        def shader_callback(_caller, _event, calldata=None):
+            program = calldata
+            if program is not None:
+                t = self._current_timestamp
+                program.SetUniformf('time', t)
+                for attrib in attribs:
+                    if self.is_interpolatable(attrib):
+                        # todo: allow not to send an attrib
+                        kfs = []
+                        t0 = get_previous_timestamp(timestamps[attrib], t)
+                        k0 = keyframes.get(attrib, {}).get(t0, None)
+                        kfs.append((t0, k0))
+                        if len(keyframes.get(attrib, {})) > 1:
+                            t1 = get_next_timestamp(timestamps[attrib], t)
+                            k1 = keyframes.get(attrib, {}).get(t1, None)
+                            kfs.append((t1, k1))
+                        program.SetUniformi(f'{attrib}_k.count', len(kfs))
+                        program.SetUniformi(f'{attrib}_k.method', 1)
+                        for i, (ts, k) in enumerate(kfs):
+                            program.SetUniformf(f'{attrib}_k.keyframes[{i}].t',
+                                                ts)
+                            for field in k:
+                                program.SetUniform3f(
+                                    f'{attrib}_k.keyframes[{i}].{field}',
+                                    k[field])
+
+                    else:
+                        program.SetUniformi(f'{attrib}_k.interpolatable', 0)
+
+        add_shader_callback(actor, shader_callback)
+
     def add_actor(self, actor, static=False):
         """Adds an actor or list of actors to the Timeline.
 
@@ -1133,7 +1185,8 @@ class Timeline(Container):
         elif static:
             self._static_actors.append(actor)
         else:
-            actor.vcolors = utils.colors_from_actor(actor)
+            if not self._using_shaders:
+                actor.vcolors = utils.colors_from_actor(actor)
             super(Timeline, self).add(actor)
 
     @property
@@ -1225,6 +1278,8 @@ class Timeline(Container):
                     self.seek(self.final_timestamp)
                     # Doing this will pause both the timeline and the panel.
                     self.playback_panel.pause()
+        else:
+            self._current_timestamp = t
         if self.has_playback_panel and (self.playing or force):
             self.update_final_timestamp()
             self.playback_panel.current_time = t
@@ -1270,7 +1325,7 @@ class Timeline(Container):
                 return
 
             # actors properties
-            if in_scene:
+            if in_scene and not self._using_shaders:
                 if self.is_interpolatable('position'):
                     position = self.get_position(t)
                     [act.SetPosition(position) for act in self.actors]
@@ -1492,6 +1547,7 @@ class Timeline(Container):
         super(Timeline, self).add_to_scene(ren)
         [ren.add(static_act) for static_act in self._static_actors]
         [ren.add(timeline) for timeline in self.timelines]
+        [self._use_shader(act, ren) for act in self.actors]
         if self._motion_path_actor:
             ren.add(self._motion_path_actor)
         self._scene = ren

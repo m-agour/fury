@@ -6,7 +6,9 @@ from fury.actor import Container
 from fury.animation.helpers import get_timestamps_from_keyframes, \
     get_next_timestamp, get_previous_timestamp
 from fury.animation.interpolator import spline_interpolator, \
-    step_interpolator, linear_interpolator
+    step_interpolator, linear_interpolator, hsv_color_interpolator, \
+    lab_color_interpolator, xyz_color_interpolator, cubic_spline_interpolator, \
+    cubic_bezier_interpolator
 import numpy as np
 from scipy.spatial import transform
 
@@ -45,7 +47,7 @@ class Timeline(Container):
     """
 
     def __init__(self, actors=None, playback_panel=False, length=None,
-                 loop=False, motion_path_res=None, use_gpu=True):
+                 loop=False, motion_path_res=None, use_gpu=1):
 
         super().__init__()
         self._using_shaders = use_gpu
@@ -73,7 +75,10 @@ class Timeline(Container):
         self._motion_path_res = motion_path_res
         self._motion_path_actor = None
         self._parent_timeline = None
-
+        self.interp_ids = {
+            linear_interpolator: 1,
+            step_interpolator: 0
+        }
         # Handle actors while constructing the timeline.
         if playback_panel:
             def set_loop(loop):
@@ -1153,7 +1158,8 @@ class Timeline(Container):
                             k1 = keyframes.get(attrib, {}).get(t1, None)
                             kfs.append((t1, k1))
                         program.SetUniformi(f'{attrib}_k.count', len(kfs))
-                        program.SetUniformi(f'{attrib}_k.method', 1)
+                        interp = self._data.get(attrib).get('interpolator').get('base')
+                        program.SetUniformi(f'{attrib}_k.method', self.interp_ids.get(interp))
                         for i, (ts, k) in enumerate(kfs):
                             program.SetUniformf(f'{attrib}_k.keyframes[{i}].t',
                                                 ts)

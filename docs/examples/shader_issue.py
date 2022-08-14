@@ -2,8 +2,8 @@ import numpy as np
 from fury import window, actor
 from fury.shaders import add_shader_callback, shader_to_actor
 
-c1 = actor.cube(np.array([[-1, 0, 0]]))
-c2 = actor.cube(np.array([[1, 0, 0]]))
+c1 = actor.sphere(np.array([[1, 0, 0]]), np.array([[1, 0, 0]]), use_primitive=1)
+c2 = actor.sphere(np.array([[1, 0, 0]]), np.array([[1, 0, 0]]))
 
 # if True , another limited method will be used but works as expected
 custom_method = False

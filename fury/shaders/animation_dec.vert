@@ -22,7 +22,7 @@ struct Keyframe {
 };
 
 struct Keyframes {
-  Keyframe[6] keyframes;
+  Keyframe[50] keyframes;
   int method;
   int count;
 };
@@ -47,7 +47,7 @@ Keyframe get_previous_keyframe(Keyframes keyframes, float t, bool last) {
   if (!last) start--;
   for (int i = start; i >= 0; i--)
     if (keyframes.keyframes[i].t <= t) return keyframes.keyframes[i];
-  return keyframes.keyframes[keyframes.count - 1];
+  return keyframes.keyframes[0];
 }
 
 
@@ -75,10 +75,15 @@ float get_time_tau(float t, float t0, float t1){
 
 vec3 lerp(Keyframes k, float t) {
   if (has_one_keyframe(k)) return k.keyframes[0].value;
-  Keyframe k0 = k.keyframes[0];
-  Keyframe k1 = k.keyframes[1];
+  Keyframe k0 = get_previous_keyframe(k, t, false);
+  Keyframe k1 = get_next_keyframe(k, t, false);
   float dt = get_time_tau_clamped(t, k0.t, k1.t);
   return mix(k0.value, k1.value, dt);
+}
+
+vec3 step(Keyframes k, float t) {
+  Keyframe kt = get_previous_keyframe(k, t, true);
+  return kt.value;
 }
 
 vec3 cubic_bezier(Keyframes k, float t) {
@@ -143,6 +148,7 @@ vec3 interp(Keyframes k, float t) {
   else if (k.method == BEZIER) return cubic_bezier(k, t);
   else if (k.method == HSV) return hsv2rgb(lerp(k, t));
   else if (k.method == XYZ) return xyz2rgb(lab2xyz(lerp(k, t)));
+  else if (k.method == STEP) return step(k, t);
 
 }
 

@@ -75,10 +75,18 @@ class Timeline(Container):
         self._motion_path_res = motion_path_res
         self._motion_path_actor = None
         self._parent_timeline = None
+
         self.interp_ids = {
+            step_interpolator: 0,
             linear_interpolator: 1,
-            step_interpolator: 0
+            cubic_bezier_interpolator: 2,
+            spline_interpolator: 0,
+            cubic_spline_interpolator: 1,
+            hsv_color_interpolator: 3,
+            lab_color_interpolator: 3,
+            xyz_color_interpolator: 4,
         }
+
         # Handle actors while constructing the timeline.
         if playback_panel:
             def set_loop(loop):
@@ -1127,51 +1135,67 @@ class Timeline(Container):
         self._timelines.append(timeline)
 
     def _use_shader(self, actor, scene):
-        shader_to_actor(actor, "vertex",
-                        impl_code=import_fury_shader('animation_impl.vert'))
+        attribs = ['position', 'scale', 'color']
+        aid = id(actor)
+        impl_animation_vert = import_fury_shader('animation_impl.vert')
+        dec_animation_vert = import_fury_shader('animation_dec.vert')
+        for attrib in attribs:
+            old, new = f'{attrib}_k', f'{attrib}_k{aid}'
+            impl_animation_vert = impl_animation_vert.replace(old, new)
+            dec_animation_vert = dec_animation_vert.replace(old, new)
         shader_to_actor(actor, "vertex", impl_code="",
                         block="color", replace_all=True, keep_default=False)
+        shader_to_actor(actor, "vertex",
+                        impl_code=impl_animation_vert)
 
-        dec_animation_vert = import_fury_shader('animation_dec.vert')
         shader_to_actor(actor, "vertex", decl_code=dec_animation_vert,
                         block="prim_id")
-        attribs = ['position', 'scale']
-        timestamps = {attrib: get_timestamps_from_keyframes(self._data.get(
-            attrib, {}).get('keyframes', {})) for attrib in attribs}
-        keyframes = {attrib: self._data.get(attrib, {}).
-            get('keyframes', {}) for attrib in attribs}
 
         def shader_callback(_caller, _event, calldata=None):
+            py2glsl = {
+                'value': 'value',
+                'pre_cp': 'inCp',
+                'post_cp': 'outCp',
+            }
             program = calldata
             if program is not None:
                 t = self._current_timestamp
                 program.SetUniformf('time', t)
+                aid = id(actor)
                 for attrib in attribs:
                     if self.is_interpolatable(attrib):
-                        # todo: allow not to send an attrib
-                        kfs = []
-                        t0 = get_previous_timestamp(timestamps[attrib], t)
-                        k0 = keyframes.get(attrib, {}).get(t0, None)
-                        kfs.append((t0, k0))
-                        if len(keyframes.get(attrib, {})) > 1:
-                            t1 = get_next_timestamp(timestamps[attrib], t)
-                            k1 = keyframes.get(attrib, {}).get(t1, None)
-                            kfs.append((t1, k1))
-                        program.SetUniformi(f'{attrib}_k.count', len(kfs))
-                        interp = self._data.get(attrib).get('interpolator').get('base')
-                        program.SetUniformi(f'{attrib}_k.method', self.interp_ids.get(interp))
-                        for i, (ts, k) in enumerate(kfs):
-                            program.SetUniformf(f'{attrib}_k.keyframes[{i}].t',
-                                                ts)
-                            for field in k:
+                        interpolator = self._data.get(attrib, {}).\
+                            get('interpolator', {}).get('base')
+                        interp_id = self.interp_ids.get(interpolator, 1)
+                        keyframes = self._data.get(attrib, {}). \
+                            get('keyframes', {})
+                        timestamps = get_timestamps_from_keyframes(keyframes)
+                        program.SetUniformi(f'{attrib}_k{aid}.count',
+                                            len(timestamps))
+                        program.SetUniformi(f'{attrib}_k{aid}.method',
+                                            interp_id)
+                        for i in range(len(timestamps)):
+                            ts = timestamps[i]
+                            program.SetUniformf(f'{attrib}_k{aid}'
+                                                f'.keyframes[{i}].t', ts)
+                            for field in keyframes[ts]:
+                                glsl_field = py2glsl.get(field, "")
                                 program.SetUniform3f(
-                                    f'{attrib}_k.keyframes[{i}].{field}',
-                                    k[field])
-
+                                    f'{attrib}_k{aid}.keyframes[{i}].'
+                                    f'{glsl_field}', keyframes[ts][field])
                     else:
-                        program.SetUniformi(f'{attrib}_k.interpolatable', 0)
+                        program.SetUniformi(f'{attrib}_k{aid}.interpolatable', 0)
+                mapper = actor.GetMapper()
+                mapper.RemoveObserver(sid)
+                add_shader_callback(actor, shader_callback_2)
 
-        add_shader_callback(actor, shader_callback)
+        def shader_callback_2(_caller, _event, calldata=None):
+            program = calldata
+            if program is not None:
+                t = self._current_timestamp
+                program.SetUniformf('time', t)
+
+        sid = add_shader_callback(actor, shader_callback)
 
     def add_actor(self, actor, static=False):
         """Adds an actor or list of actors to the Timeline.
@@ -1284,8 +1308,8 @@ class Timeline(Container):
                     self.seek(self.final_timestamp)
                     # Doing this will pause both the timeline and the panel.
                     self.playback_panel.pause()
-        else:
-            self._current_timestamp = t
+
+        self._current_timestamp = t
         if self.has_playback_panel and (self.playing or force):
             self.update_final_timestamp()
             self.playback_panel.current_time = t
@@ -1553,7 +1577,8 @@ class Timeline(Container):
         super(Timeline, self).add_to_scene(ren)
         [ren.add(static_act) for static_act in self._static_actors]
         [ren.add(timeline) for timeline in self.timelines]
-        [self._use_shader(act, ren) for act in self.actors]
+        if self._using_shaders:
+            [self._use_shader(act, ren) for act in self.actors]
         if self._motion_path_actor:
             ren.add(self._motion_path_actor)
         self._scene = ren

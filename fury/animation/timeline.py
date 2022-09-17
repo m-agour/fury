@@ -57,8 +57,6 @@ class Timeline(Container):
         self._playing = False
         self._length = length
         self._final_timestamp = 0
-        self._needs_update = False
-        self._reverse_playing = False
         self._loop = loop
         self._added_to_scene = True
         self._add_to_scene_time = 0
@@ -1151,6 +1149,13 @@ class Timeline(Container):
 
     @property
     def parent_timeline(self) -> 'Timeline':
+        """Return the parent `Timeline`.
+
+        Returns
+        -------
+        Timeline: the parent ``Timeline`` or ``None`` if current ``Timeline``
+        parentless.
+        """
         return self._parent_timeline
 
     @property

@@ -3748,9 +3748,15 @@ class PlaybackPanel(UI):
         self.speed_text.font_size = 21 if .01 <= speed < 100 else 14
         self.speed_text.message = speed_str
 
+    def show(self):
+        [act.SetVisibility(1) for act in self._get_actors()]
+
+    def hide(self):
+        [act.SetVisibility(1) for act in self._get_actors()]
+
     def _get_actors(self):
         """Get the actors composing this UI component."""
-        return self.panel.actors + self._progress_bar.actors +\
+        return self.panel.actors + self._progress_bar.actors + \
                self.time_text.actors
 
     def _add_to_scene(self, _scene):

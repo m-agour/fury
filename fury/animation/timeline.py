@@ -1,6 +1,9 @@
 import time
 import warnings
 from collections import defaultdict
+
+from vtkmodules.util import numpy_support
+
 from fury import utils, actor
 from fury.actor import Container
 from fury.animation.interpolator import spline_interpolator, \
@@ -8,7 +11,11 @@ from fury.animation.interpolator import spline_interpolator, \
 import numpy as np
 from scipy.spatial import transform
 from fury.ui.elements import PlaybackPanel
-from fury.lib import Actor, Transform
+from fury.lib import Actor, Transform, WindowToImageFilter, RenderWindow
+from PIL import Image
+import cv2
+
+from fury.window import antialiasing
 
 
 class Timeline(Container):

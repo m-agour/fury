@@ -3752,7 +3752,7 @@ class PlaybackPanel(UI):
         [act.SetVisibility(1) for act in self._get_actors()]
 
     def hide(self):
-        [act.SetVisibility(1) for act in self._get_actors()]
+        [act.SetVisibility(0) for act in self._get_actors()]
 
     def _get_actors(self):
         """Get the actors composing this UI component."""

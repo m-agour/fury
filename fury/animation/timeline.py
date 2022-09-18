@@ -1552,16 +1552,17 @@ class Timeline(Container):
         self._added_to_scene = True
         self.update_animation(force=True)
 
-    def record(self, fname, fps=30, speed=1.0, size=(900, 768),
+    def record(self, fname=None, fps=30, speed=1.0, size=(900, 768),
                order_transparent=True, multi_samples=8,
                max_peels=4, show_panel=False):
         """Record the animation
 
         Parameters
         -----------
-        fname : str
+        fname : str, optional, default : None
             The file name. Save a GIF file if name ends with '.gif', or mp4
             video if name ends with'.mp4'.
+            If None, this method will only return an array of frames.
         fps : int, optional, default 30
             The number of frames per second of the record.
         size : (int, int)
@@ -1579,6 +1580,15 @@ class Timeline(Container):
         show_panel : bool, optional, default False
             Controls whether to show the playback (if True) panel of hide it
             (if False)
+
+        Returns
+        -------
+        ndarray:
+            The recorded frames.
+
+        Notes
+        -----
+        It's recommended to use 50 or 30 fps while recording to a gif file.
         """
 
         duration = self.final_timestamp
@@ -1609,6 +1619,10 @@ class Timeline(Container):
                                                                  components)
             frames.append(snap)
             t += step
+
+        if fname is None:
+            return frames
+
         images = [Image.fromarray(frame).transpose(1) for frame in frames]
         if 'mp4' not in fname:
             if fname[-4:] != '.gif':
@@ -1630,3 +1644,4 @@ class Timeline(Container):
 
             out.release()
         self.playback_panel.show()
+        return frames

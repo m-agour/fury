@@ -8,6 +8,7 @@ from fury.animation.interpolator import linear_interpolator, \
 from fury.animation.timeline import Timeline
 import fury.testing as ft
 from fury.ui import PlaybackPanel
+from fury.window import Scene, ShowManager
 
 
 def assert_not_equal(x, y):
@@ -103,3 +104,13 @@ def test_timeline():
                                 transform.GetScale())
         npt.assert_almost_equal(tl.get_rotation(tl.current_timestamp),
                                 transform.GetOrientation())
+
+    scene = Scene()
+    showm = ShowManager(scene)
+    scene.add(tl)
+    frames = tl.record(fps=14, speed=1.0)
+
+    for idx1, frame1 in enumerate(frames[:-1]):
+        assert_not_equal(np.mean(frame1), np.mean(frames[idx1 + 1]))
+
+    npt.assert_almost_equal(len(frames), tl.final_timestamp * 14)

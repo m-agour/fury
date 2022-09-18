@@ -1595,7 +1595,7 @@ class Timeline(Container):
         if order_transparent:
             antialiasing(self._scene, render_window, multi_samples, max_peels,
                          0)
-        while t < duration + step:
+        while t < duration:
             self.seek(t)
             render_window.Render()
             window_to_image_filter = WindowToImageFilter()

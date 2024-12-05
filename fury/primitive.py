@@ -1052,9 +1052,10 @@ def prim_cylinder(*, radius=0.5, height=1, sectors=36, capped=True):
     return vertices, triangles
 
 
-@warn_on_args_to_kwargs()
+# @warn_on_args_to_kwargs()
 def prim_arrow(
     *,
+    center=(0, 0, 0),
     height=1.0,
     resolution=10,
     tip_length=0.35,
@@ -1065,6 +1066,8 @@ def prim_arrow(
 
     Parameters
     ----------
+    center : tuple
+        The center of the arrow (default: (0, 0, 0)).
     height : float
         The height of the arrow (default: 1.0).
     resolution : int
@@ -1142,7 +1145,7 @@ def prim_arrow(
         # tip cone t[i], t[i + 1], 2
         all_faces.append((2, i + off_3, i + off_3 + 1))
 
-    vertices = np.asarray(all_verts)
+    vertices = np.asarray(all_verts) + np.asarray(center)
     triangles = np.asarray(all_faces, dtype=int)
 
     return vertices, triangles

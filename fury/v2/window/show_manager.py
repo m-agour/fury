@@ -93,7 +93,11 @@ class ShowManager:
         img.save(fname)
 
     def render(self):
-        self.window.request_draw(lambda: self.renderer.render(self.scene, self.camera))
+        def r():
+            self.renderer.render(self.scene, self.camera)
+            print(self.camera.local.position)
+
+        self.window.request_draw(r)
 
     def start(self):
         self.render()

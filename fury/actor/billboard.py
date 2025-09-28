@@ -103,6 +103,7 @@ class Billboard(Mesh):
     uses camera right/up vectors to orient. Size metadata is stored on
     ``billboard_sizes`` and reused by shaders for impostor variants.
     """
+
     pass
 
 
@@ -128,6 +129,12 @@ def billboard(
         Global opacity multiplier (0..1).
     enable_picking : bool
         Whether billboard is pickable.
+
+    Returns
+    -------
+    Billboard
+        Billboard world object configured with the provided geometry and
+        material.
     """
     return _create_billboard_actor(
         centers,
@@ -165,6 +172,18 @@ def create_billboard_sphere(
 
 @register_wgpu_render_function(Billboard, BillboardMaterial)
 def register_billboard_render_function(wobject):
+    """Build the render pipeline for ``Billboard`` instances.
+
+    Parameters
+    ----------
+    wobject : Billboard
+        Billboard world object to bind to the shader pipeline.
+
+    Returns
+    -------
+    tuple
+        Tuple containing the configured shader instance.
+    """
     from fury.shader import BillboardShader
 
     return (BillboardShader(wobject),)

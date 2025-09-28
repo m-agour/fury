@@ -494,3 +494,15 @@ class BillboardShader(MeshShader):
             The WGSL code as a string.
         """
         return load_wgsl("billboard_render.wgsl", package_name="fury.wgsl")
+
+
+class BillboardSphereShader(MeshShader):
+    """Shader for billboard-based sphere impostors."""
+
+    def __init__(self, wobject):
+        super().__init__(wobject)
+        self["billboard_count"] = getattr(wobject, "billboard_count", 1)
+        self["lighting"] = "phong"
+
+    def get_code(self):
+        return load_wgsl("billboard_sphere_render.wgsl", package_name="fury.wgsl")

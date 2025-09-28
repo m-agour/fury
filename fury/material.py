@@ -807,3 +807,11 @@ class BillboardMaterial(MeshBasicMaterial):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+
+
+class BillboardSphereMaterial(MeshPhongMaterial):
+    """Phong-lit material for billboard-based impostor spheres."""
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault("flat_shading", False)
+        super().__init__(**kwargs)

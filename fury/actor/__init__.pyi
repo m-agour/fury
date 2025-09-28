@@ -29,7 +29,6 @@ __all__ = [
     "text",
     "triangle",
     "billboard",
-    "billboard_sphere",
     "sph_glyph",
     "vector_field",
     "vector_field_slicer",
@@ -46,7 +45,7 @@ __all__ = [
 from .bio import peaks_slicer, volume_slicer
 from .core import actor_from_primitive, arrow, axes, line
 from .curved import cone, cylinder, ellipsoid, sphere, streamlines, streamtube
-from .billboard import billboard, billboard_sphere
+from .billboard import billboard
 from .planar import (
     disk,
     image,

@@ -1,15 +1,22 @@
+import math
+
 import numpy as np
 
 from fury.actor import SphGlyph, VectorField
-from fury.actor.curved import Streamlines
+from fury.actor.curved import (
+    Streamlines,
+    create_gpu_streamtube,
+    register_gpu_streamtube_shaders,
+)
 from fury.actor.planar import LineProjection
 from fury.geometry import line_buffer_separator
-from fury.lib import load_wgsl
+from fury.lib import MeshPhongShader, load_wgsl
 from fury.primitive import prim_sphere
 from fury.shader import (
     LineProjectionComputeShader,
     SphGlyphComputeShader,
     StreamlinesShader,
+    StreamtubeComputeShader,
     VectorFieldArrowShader,
     VectorFieldComputeShader,
     VectorFieldShader,
@@ -199,6 +206,60 @@ def test_SphGlyphComputeShader_get_code():
     code = shader.get_code()
     assert isinstance(code, str)
     assert load_wgsl("sph_glyph_compute.wgsl", package_name="fury.wgsl") == code
+
+
+def _make_gpu_streamtube():
+    lines = [
+        np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 0.5, 0.5]], dtype=np.float32),
+        np.array([[0.2, 0.1, 0.0], [0.6, 0.4, 0.5]], dtype=np.float32),
+    ]
+    colors = np.array([[0.9, 0.1, 0.0], [0.0, 0.5, 0.9]], dtype=np.float32)
+    return create_gpu_streamtube(lines, colors=colors, segments=4, end_caps=True)
+
+
+def test_StreamtubeComputeShader_setup_and_bindings():
+    """Streamtube compute shader exposes expected bindings and uniforms."""
+    wobject = _make_gpu_streamtube()
+    shader = StreamtubeComputeShader(wobject)
+
+    assert shader.type == "compute"
+    assert shader["n_lines"] == wobject.n_lines
+    assert shader["max_line_length"] == wobject.max_line_length
+    assert shader["tube_sides"] == wobject.tube_sides
+    assert math.isclose(shader["tube_radius"], wobject.material.radius)
+    assert shader["end_caps"] == 1
+    assert shader["color_channels"] == wobject.color_components
+
+    workgroup = min(64, max(int(wobject.n_lines), 1))
+    expected_groups = int(math.ceil(wobject.n_lines / workgroup))
+    render_info = shader.get_render_info(wobject, {})
+    assert render_info["indices"] == (expected_groups, 1, 1)
+
+    bindings = shader.get_bindings_info(wobject, {})
+    assert set(bindings.keys()) == {0}
+    assert set(bindings[0].keys()) == {0, 1, 2, 3, 4, 5, 6, 7, 8}
+    assert bindings[0][0].resource is wobject.line_buffer
+    assert bindings[0][5].resource is wobject.geometry.positions
+    assert isinstance(shader.get_code(), str)
+
+
+def test_StreamtubeComputeShader_zero_lines_dispatch():
+    """Dispatch collapses to zero groups when no lines are rendered."""
+    wobject = _make_gpu_streamtube()
+    shader = StreamtubeComputeShader(wobject)
+    wobject.n_lines = 0
+
+    render_info = shader.get_render_info(wobject, {})
+    assert render_info["indices"] == (0, 1, 1)
+
+
+def test_register_gpu_streamtube_shaders():
+    """Registering GPU streamtube shaders returns compute + phong shader."""
+    wobject = _make_gpu_streamtube()
+    compute_shader, render_shader = register_gpu_streamtube_shaders(wobject)
+
+    assert isinstance(compute_shader, StreamtubeComputeShader)
+    assert isinstance(render_shader, MeshPhongShader)
 
 
 def test_streamline_shader_get_code():

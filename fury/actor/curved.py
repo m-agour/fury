@@ -13,7 +13,6 @@ from fury.lib import (
     MeshPhongShader,
     register_wgpu_render_function,
 )
-from fury.shader import StreamtubeComputeShader
 from fury.material import (
     StreamlinesMaterial,
     StreamtubeGPUMaterial,
@@ -22,7 +21,7 @@ from fury.material import (
 )
 from fury.optpkg import optional_package
 import fury.primitive as fp
-from fury.shader import StreamlinesShader
+from fury.shader import StreamlinesShader, StreamtubeComputeShader
 
 numba, have_numba, _ = optional_package("numba")
 
@@ -754,7 +753,6 @@ def generate_tube_geometry(points, number_of_sides, radius, end_caps):
     return vertices, indices
 
 
-
 def create_gpu_streamtube(
     lines,
     *,
@@ -767,7 +765,36 @@ def create_gpu_streamtube(
     flat_shading=False,
     material="phong",
 ):
-    """Create a GPU-accelerated streamtube using compute shaders."""
+    """Create streamtube geometry on the GPU using compute shaders.
+
+    Parameters
+    ----------
+    lines : sequence of array_like, shape (N_i, 3)
+        Iterable of polylines representing streamline vertices. Each line is
+        converted to ``float32`` and padded to the maximum length for GPU upload.
+    colors : array_like or None, optional
+        Per-line colors. Accepts a single RGB/RGBA vector or an array of shape
+        ``(1, 3|4)``/``(n_lines, 3|4)``. Defaults to white per line when ``None``.
+    opacity : float, optional
+        Opacity multiplier applied to the material. Valid range is ``[0, 1]``.
+    radius : float, optional
+        Tube radius in world units.
+    segments : int, optional
+        Number of radial segments making up the tube cross-section.
+    end_caps : bool, optional
+        If ``True`` flat caps are generated on both ends of each tube.
+    enable_picking : bool, optional
+        Whether the mesh writes to the picking buffer.
+    flat_shading : bool, optional
+        Controls whether flat or smooth shading is used by the Phong material.
+    material : {"phong"}, optional
+        Material type. GPU streamtubes currently only support ``"phong"``.
+
+    Returns
+    -------
+    Mesh
+        A pygfx mesh containing GPU-generated streamtube geometry and material.
+    """
 
     if material != "phong":
         raise ValueError("GPU streamtubes currently support material='phong' only.")
@@ -808,9 +835,7 @@ def create_gpu_streamtube(
 
     # Prepare colors per line in RGBA format
     if colors is None:
-        line_colors = np.tile(
-            np.array([1.0, 1.0, 1.0], dtype=np.float32), (n_lines, 1)
-        )
+        line_colors = np.tile(np.array([1.0, 1.0, 1.0], dtype=np.float32), (n_lines, 1))
     else:
         colors_arr = np.asarray(colors, dtype=np.float32)
         if colors_arr.ndim == 1:
@@ -820,7 +845,8 @@ def create_gpu_streamtube(
                 colors_arr = colors_arr[:3]
             else:
                 raise ValueError(
-                    "Colors must have length 3 (RGB) or 4 (RGBA) when provided as a vector."
+                    "Colors must have length 3 (RGB) or 4 (RGBA) when provided as a "
+                    "vector."
                 )
             line_colors = np.tile(colors_arr, (n_lines, 1))
         elif colors_arr.ndim == 2:
@@ -838,11 +864,11 @@ def create_gpu_streamtube(
             elif base_colors.shape[1] == 4:
                 line_colors = base_colors[:, :3]
             else:
-                raise ValueError(
-                    "Colors second dimension must be 3 (RGB) or 4 (RGBA)."
-                )
+                raise ValueError("Colors second dimension must be 3 (RGB) or 4 (RGBA).")
         else:
-            raise ValueError("Colors must be a vector or a 2D array when using GPU backend.")
+            raise ValueError(
+                "Colors must be a vector or a 2D array when using GPU backend."
+            )
 
     line_colors = line_colors.astype(np.float32, copy=False)
     color_components = line_colors.shape[1]
@@ -864,9 +890,9 @@ def create_gpu_streamtube(
         vertex_offsets[1:] = np.cumsum(vertices_per_line[:-1], dtype=np.uint64).astype(
             np.uint32
         )
-        triangle_offsets[1:] = np.cumsum(triangles_per_line[:-1], dtype=np.uint64).astype(
-            np.uint32
-        )
+        triangle_offsets[1:] = np.cumsum(
+            triangles_per_line[:-1], dtype=np.uint64
+        ).astype(np.uint32)
 
     total_vertices = int(vertices_per_line.astype(np.uint64).sum())
     total_triangles = int(triangles_per_line.astype(np.uint64).sum())
@@ -970,7 +996,6 @@ def streamtube(
     Actor
         A mesh actor containing the generated streamtubes.
     """
-    
 
     if backend == "gpu":
         return create_gpu_streamtube(
@@ -984,7 +1009,7 @@ def streamtube(
             flat_shading=flat_shading,
             material=material,
         )
-    
+
     # Default CPU implementation
 
     def task(points):
@@ -1067,9 +1092,21 @@ def streamtube(
     obj = create_mesh(geometry=geo, material=mat)
     return obj
 
+
 @register_wgpu_render_function(Mesh, StreamtubeGPUMaterial)
 def register_gpu_streamtube_shaders(wobject):
-    """Register compute and render shaders for GPU streamtubes."""
+    """Create the compute and render shaders used by GPU streamtubes.
+
+    Parameters
+    ----------
+    wobject : Mesh
+        Mesh produced by :func:`create_gpu_streamtube`.
+
+    Returns
+    -------
+    tuple of BaseShader
+        A ``(compute_shader, render_shader)`` pair ready for registration.
+    """
 
     compute_shader = StreamtubeComputeShader(wobject)
     render_shader = MeshPhongShader(wobject)

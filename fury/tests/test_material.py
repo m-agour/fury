@@ -20,6 +20,7 @@ from fury.lib import (
 from fury.material import (
     SphGlyphMaterial,
     StreamlinesMaterial,
+    StreamtubeGPUMaterial,
     VectorFieldArrowMaterial,
     VectorFieldLineMaterial,
     VectorFieldThinLineMaterial,
@@ -697,3 +698,67 @@ def test_StreamlinesMaterial_edge_cases():
         material.outline_color = 0.5
     except (ValueError, IndexError, TypeError):
         pass  # Expected to fail
+
+
+def test_StreamtubeGPUMaterial_defaults():
+    """StreamtubeGPUMaterial: Test default initialization populates uniforms."""
+    mat = StreamtubeGPUMaterial()
+
+    assert isinstance(mat, material.MeshPhongMaterial)
+    assert mat.radius == pytest.approx(0.2)
+    assert mat.segments == 8
+    assert mat.end_caps is True
+    assert mat.line_count == 0
+    assert mat.uniform_buffer.data["tube_radius"] == pytest.approx(0.2)
+    assert mat.uniform_buffer.data["tube_segments"] == 8
+    assert mat.uniform_buffer.data["tube_end_caps"] == 1
+    assert mat.uniform_buffer.data["line_count"] == 0
+
+
+def test_StreamtubeGPUMaterial_parameter_updates():
+    """StreamtubeGPUMaterial: Test property setters update uniforms."""
+    mat = StreamtubeGPUMaterial(radius=0.4, segments=12, end_caps=False)
+
+    assert mat.radius == pytest.approx(0.4)
+    assert mat.uniform_buffer.data["tube_radius"] == pytest.approx(0.4)
+
+    mat.radius = 0.75
+    assert mat.radius == pytest.approx(0.75)
+    assert mat.uniform_buffer.data["tube_radius"] == pytest.approx(0.75)
+
+    assert mat.segments == 12
+    mat.segments = 24
+    assert mat.segments == 24
+    assert mat.uniform_buffer.data["tube_segments"] == 24
+
+    assert mat.end_caps is False
+    mat.end_caps = True
+    assert mat.end_caps is True
+    assert mat.uniform_buffer.data["tube_end_caps"] == 1
+
+    mat.line_count = 42
+    assert mat.line_count == 42
+    assert mat.uniform_buffer.data["line_count"] == 42
+
+
+def test_StreamtubeGPUMaterial_uniform_type():
+    """StreamtubeGPUMaterial: Uniform layout extends MeshPhongMaterial."""
+    uniform_type = StreamtubeGPUMaterial.uniform_type
+
+    assert uniform_type["tube_radius"] == "f4"
+    assert uniform_type["tube_segments"] == "u4"
+    assert uniform_type["tube_end_caps"] == "i4"
+    assert uniform_type["line_count"] == "u4"
+    assert "color" in uniform_type
+    assert "shininess" in uniform_type
+
+
+def test_StreamtubeGPUMaterial_setup_compute_shader():
+    """StreamtubeGPUMaterial: Compute shader config stores parameters."""
+    mat = StreamtubeGPUMaterial(radius=0.3, segments=6, end_caps=True)
+
+    mat._setup_compute_shader(line_count=5, max_line_length=18, tube_segments=20)
+
+    assert mat.line_count == 5
+    assert mat.segments == 20
+    assert mat._max_line_length == 18

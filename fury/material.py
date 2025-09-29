@@ -791,6 +791,87 @@ class StreamlinesMaterial(LineMaterial):
         self.uniform_buffer.update_full()
 
 
+class StreamtubeMaterial(MeshPhongMaterial):
+    """Material for GPU-generated streamtubes."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+
+class StreamtubeGPUMaterial(MeshPhongMaterial):
+    """Material for GPU streamtubes with compute + vertex shader."""
+
+    uniform_type = dict(
+        MeshPhongMaterial.uniform_type,
+        tube_radius="f4",
+        tube_segments="u4", 
+        tube_end_caps="i4",
+        line_count="u4",
+    )
+
+    def __init__(
+        self,
+        *,
+        radius=0.2,
+        segments=8,
+        end_caps=True,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.radius = radius
+        self.segments = segments
+        self.end_caps = end_caps
+        self.line_count = 0  # Will be set by streamtube
+
+    @property
+    def radius(self):
+        return float(self.uniform_buffer.data["tube_radius"])
+
+    @radius.setter
+    def radius(self, value):
+        self.uniform_buffer.data["tube_radius"] = float(value)
+        self.uniform_buffer.update_full()
+
+    @property
+    def segments(self):
+        return int(self.uniform_buffer.data["tube_segments"])
+
+    @segments.setter
+    def segments(self, value):
+        self.uniform_buffer.data["tube_segments"] = int(value)
+        self.uniform_buffer.update_full()
+
+    @property
+    def end_caps(self):
+        return bool(self.uniform_buffer.data["tube_end_caps"])
+
+    @end_caps.setter
+    def end_caps(self, value):
+        self.uniform_buffer.data["tube_end_caps"] = int(bool(value))
+        self.uniform_buffer.update_full()
+
+    @property
+    def line_count(self):
+        return int(self.uniform_buffer.data["line_count"])
+
+    @line_count.setter
+    def line_count(self, value):
+        self.uniform_buffer.data["line_count"] = int(value)
+        self.uniform_buffer.update_full()
+
+    def _setup_compute_shader(self, line_count, max_line_length, tube_segments):
+        """Setup compute shader for streamtube geometry generation."""
+        # Update uniforms
+        self.line_count = line_count
+        self.segments = tube_segments
+        
+        # Store shader parameters for later use
+        self._max_line_length = max_line_length
+        
+        # The compute shader WGSL will be applied during rendering
+        # This method just configures the material for GPU computation
+
+
 class BillboardMaterial(MeshBasicMaterial):
     """Billboard material for creating quads that always face the camera.
 

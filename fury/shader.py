@@ -494,3 +494,75 @@ class BillboardShader(MeshShader):
             The WGSL code as a string.
         """
         return load_wgsl("billboard_render.wgsl", package_name="fury.wgsl")
+
+
+class StreamtubeComputeShader(BaseShader):
+    """Compute shader that generates streamtube geometry on the GPU."""
+
+    type = "compute"
+
+    def __init__(self, wobject):
+        super().__init__(wobject)
+        self["n_lines"] = wobject.n_lines
+        self["max_line_length"] = wobject.max_line_length
+        self["tube_sides"] = wobject.tube_sides
+        self["tube_radius"] = float(wobject.material.radius)
+        self["workgroup_size"] = min(64, max(int(wobject.n_lines), 1))
+        self["end_caps"] = 1 if getattr(wobject, "end_caps", False) else 0
+        self["color_channels"] = getattr(wobject, "color_components", 3)
+
+    def get_render_info(self, wobject, _shared):
+        """Return the dispatch dimensions for the compute shader."""
+        workgroup_size = min(64, max(int(wobject.n_lines), 1))
+        n_lines = int(wobject.n_lines)
+        if n_lines == 0:
+            return {"indices": (0, 1, 1)}
+        groups = int(ceil(n_lines / workgroup_size))
+        return {"indices": (groups, 1, 1)}
+
+    def get_pipeline_info(self, _wobject, _shared):
+        """No additional pipeline info required for compute shader."""
+
+        return {}
+
+    def get_bindings(self, wobject, _shared):
+        """Describe storage buffers used by the compute shader."""
+
+        geometry = wobject.geometry
+
+        self["n_lines"] = wobject.n_lines
+        self["max_line_length"] = wobject.max_line_length
+        self["tube_sides"] = wobject.tube_sides
+        self["tube_radius"] = float(wobject.material.radius)
+        self["workgroup_size"] = min(64, max(int(wobject.n_lines), 1))
+        self["color_channels"] = getattr(wobject, "color_components", 3)
+        self["end_caps"] = 1 if getattr(wobject, "end_caps", False) else 0
+
+        bindings = {
+            0: Binding("s_line_data", "buffer/storage", wobject.line_buffer, "COMPUTE"),
+            1: Binding("s_line_lengths", "buffer/storage", wobject.length_buffer, "COMPUTE"),
+            2: Binding("s_line_colors", "buffer/storage", wobject.color_buffer, "COMPUTE"),
+            3: Binding(
+                "s_vertex_offsets",
+                "buffer/storage",
+                wobject.vertex_offset_buffer,
+                "COMPUTE",
+            ),
+            4: Binding(
+                "s_triangle_offsets",
+                "buffer/storage",
+                wobject.triangle_offset_buffer,
+                "COMPUTE",
+            ),
+            5: Binding("s_vertex_positions", "buffer/storage", geometry.positions, "COMPUTE"),
+            6: Binding("s_vertex_normals", "buffer/storage", geometry.normals, "COMPUTE"),
+            7: Binding("s_vertex_colors", "buffer/storage", geometry.colors, "COMPUTE"),
+            8: Binding("s_indices", "buffer/storage", geometry.indices, "COMPUTE"),
+        }
+        self.define_bindings(0, bindings)
+        return {0: bindings}
+
+    def get_code(self):
+        """Load the WGSL source for the streamtube compute shader."""
+
+        return load_wgsl("streamtube_compute.wgsl", package_name="fury.wgsl")

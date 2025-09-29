@@ -800,7 +800,7 @@ class BillboardMaterial(MeshBasicMaterial):
 
     Parameters
     ----------
-    **material_kwargs : dict
+    **kwargs : dict
         Additional keyword arguments forwarded to
         :class:`~fury.material.MeshBasicMaterial`.
     """

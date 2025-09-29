@@ -262,6 +262,22 @@ def test_register_gpu_streamtube_shaders():
     assert isinstance(render_shader, MeshPhongShader)
 
 
+def test_StreamtubeComputeShader_single_dispatch():
+    """GPU streamtube compute shader dispatches only once unless flagged."""
+    wobject = _make_gpu_streamtube()
+    shader = StreamtubeComputeShader(wobject)
+
+    first = shader.get_render_info(wobject, {})["indices"]
+    assert first[0] > 0
+
+    second = shader.get_render_info(wobject, {})["indices"]
+    assert second == (0, 1, 1)
+
+    wobject._needs_gpu_update = True
+    third = shader.get_render_info(wobject, {})["indices"]
+    assert third[0] > 0
+
+
 def test_streamline_shader_get_code():
     """Test StreamlineShader.get_code()."""
     # Create sample lines data for Streamline constructor

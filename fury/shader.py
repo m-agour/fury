@@ -517,6 +517,8 @@ class StreamtubeComputeShader(BaseShader):
         """
 
         super().__init__(wobject)
+        if not hasattr(wobject, "_needs_gpu_update"):
+            wobject._needs_gpu_update = True
         self["n_lines"] = wobject.n_lines
         self["max_line_length"] = wobject.max_line_length
         self["tube_sides"] = wobject.tube_sides
@@ -540,11 +542,13 @@ class StreamtubeComputeShader(BaseShader):
         dict
             Dictionary containing ``indices`` dispatch dimensions.
         """
-        workgroup_size = min(64, max(int(wobject.n_lines), 1))
+        needs_update = getattr(wobject, "_needs_gpu_update", True)
         n_lines = int(wobject.n_lines)
-        if n_lines == 0:
+        if not needs_update or n_lines == 0:
             return {"indices": (0, 1, 1)}
+        workgroup_size = min(64, max(n_lines, 1))
         groups = int(ceil(n_lines / workgroup_size))
+        wobject._needs_gpu_update = False
         return {"indices": (groups, 1, 1)}
 
     def get_pipeline_info(self, _wobject, _shared):

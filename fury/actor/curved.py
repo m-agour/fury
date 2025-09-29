@@ -933,6 +933,7 @@ def create_gpu_streamtube(
     mesh_obj.lines = lines_arr
     mesh_obj.line_colors = line_colors
     mesh_obj.color_components = color_components
+    mesh_obj._needs_gpu_update = True
 
     mesh_obj.line_buffer = Buffer(line_data.reshape(-1))
     mesh_obj.length_buffer = Buffer(line_lengths)

@@ -14,6 +14,7 @@ import numpy.testing as npt
 from fury import actor, window
 from fury.lib import MeshPhongMaterial
 from fury.material import BillboardSphereMaterial
+from fury.utils import get_n_coeffs
 
 
 def test_basic_billboard(interactive: bool = False):
@@ -183,6 +184,55 @@ def test_billboard_sphere(interactive: bool = False):
     positive_red = red_channel[red_channel > 0]
     assert positive_red.size > 0
     assert positive_red.max() > positive_red.min()
+
+    scene.clear()
+    if tmp_file and os.path.exists(tmp_file):
+        os.remove(tmp_file)
+
+
+def test_sph_glyph_billboard_basic():
+    """Verify spherical harmonic billboard creation and metadata."""
+
+    coeffs = np.zeros((1, 1, 2, 4), dtype=np.float32)
+    coeffs[0, 0, 0, 0] = 0.8
+    coeffs[0, 0, 1, 0] = -0.6
+
+    glyph = actor.sph_glyph_billboard(coeffs, scale=0.75)
+
+    assert glyph.__class__.__name__ == "SphGlyphBillboard"
+    assert glyph.billboard_count == 2
+    assert glyph.n_coeff == 4
+    npt.assert_equal(glyph.billboard_sizes.shape, (2, 2))
+    assert np.all(glyph.billboard_sizes[:, 0] > 0)
+    assert np.all(glyph.billboard_sizes[:, 0] * 0.5 >= glyph.billboard_radii)
+    npt.assert_equal(glyph.sh_coeffs.shape[0], 8)
+
+    glyph.l_max = 0
+    assert glyph.material.n_coeffs == get_n_coeffs(0)
+
+
+def test_sph_glyph_billboard_render(interactive: bool = False):
+    """Ensure spherical harmonic billboard renders without errors."""
+
+    coeffs = np.zeros((1, 1, 1, 4), dtype=np.float32)
+    coeffs[0, 0, 0, 0] = 0.6
+
+    glyph_actor = actor.sph_glyph_billboard(coeffs, color_type="sign")
+
+    scene = window.Scene()
+    scene.background = (0, 0, 0)
+    scene.add(glyph_actor)
+
+    if interactive:  # pragma: no cover
+        window.show(scene)
+
+    tmp_file = tempfile.mktemp(suffix="_sphglyph_bb.png")
+    arr = window.snapshot(scene=scene, fname=tmp_file, return_array=True)
+
+    assert arr is not None
+    assert arr.ndim == 3 and arr.shape[-1] >= 3
+    data = np.asarray(arr)
+    assert np.any(data[..., 0] > data[..., 2])
 
     scene.clear()
     if tmp_file and os.path.exists(tmp_file):
